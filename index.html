@@ -239,7 +239,7 @@
       <p style="margin-bottom:14px;color:#6c757d;">
         Sign in to access the shared committee database. Your Google account name will be recorded with changes.
       </p>
-      <button class="btn" onclick="signIn()">Continue with Google</button>
+      <button class="btn" type="button" id="googleSignInBtn">Continue with Google</button>
       <p id="loginError" class="error-text"></p>
     </div>
   </div>
@@ -480,6 +480,10 @@
     const db = getFirestore(appFirebase);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
+
+    // Bind the Google button directly after Firebase Auth initializes.
+    // This avoids relying on an inline onclick handler inside the module script.
+    document.getElementById("googleSignInBtn")?.addEventListener("click", signIn);
 
     // These are the original pre-inserted records from the uploaded file.
     // They are used only to seed the shared database once.
