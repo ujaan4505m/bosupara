@@ -614,7 +614,8 @@
           paid: Number(item.paid_2025 || 0),
           is_due: false,
           date_paid: "",
-          remarks: ""
+          remarks: "",
+          lastChangedBy: "Initial imported data"
         };
       }
       return {
@@ -622,7 +623,8 @@
         paid: Number(item.years?.[String(year)]?.paid || 0),
         is_due: Boolean(item.years?.[String(year)]?.is_due),
         date_paid: item.years?.[String(year)]?.date_paid ?? "",
-        remarks: item.years?.[String(year)]?.remarks ?? ""
+        remarks: item.years?.[String(year)]?.remarks ?? "",
+        lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? ""
       };
     }
 
@@ -696,8 +698,8 @@
           badge = `<span class="badge badge-paid">PAID: ₹${yd.paid}</span>`;
         }
 
-        const change = item.lastChangedBy && item.lastChangedBy !== "Initial imported data"
-          ? `<p class="last-change">Last change by <b>${esc(item.lastChangedBy)}</b></p>` : "";
+        const change = yd.lastChangedBy && yd.lastChangedBy !== "Initial imported data"
+          ? `<p class="last-change">Last change by <b>${esc(yd.lastChangedBy)}</b></p>` : "";
 
         return `
           <div class="member-item" onclick="openEditModal('${esc(item.id)}')">
@@ -735,13 +737,13 @@
       const readOnlyYear = currentYear === 2025;
       $("editName").readOnly = readOnlyYear;
       $("editStreet").readOnly = readOnlyYear;
-      $("editPhone").readOnly = readOnlyYear;
+      $("editPhone").readOnly = false;
       $("editBillNoYear").readOnly = readOnlyYear;
       $("editPaidYear").readOnly = readOnlyYear;
       $("editDatePaid").readOnly = readOnlyYear;
       $("editRemarks").readOnly = readOnlyYear;
       $("dueToggleBtn").disabled = readOnlyYear;
-      $("saveBtn").style.display = readOnlyYear ? "none" : "inline-flex";
+      $("saveBtn").style.display = "inline-flex";
 
       $("yearBillLabel").textContent = `${currentYear} Bill No.`;
       $("yearPaidLabel").textContent = `${currentYear} PAID (₹)`;
@@ -750,9 +752,9 @@
       updateDueButtonText();
 
       const changeBox = $("lastChangeBox");
-      if (item.lastChangedBy) {
+      if (yd.lastChangedBy) {
         changeBox.style.display = "block";
-        changeBox.innerHTML = `Last change recorded by <b>${esc(item.lastChangedBy)}</b>.`;
+        changeBox.innerHTML = `Last change recorded in ${currentYear} by <b>${esc(yd.lastChangedBy)}</b>.`;
       } else {
         changeBox.style.display = "none";
       }
@@ -821,37 +823,48 @@
 
     async function saveMember(e) {
       e.preventDefault();
-      if (currentYear === 2025) return;
 
       const id = $("editId").value;
       const name = $("editName").value.trim();
       const street = $("editStreet").value.trim();
+      const phone = $("editPhone").value.trim();
       const yearKey = String(currentYear);
+      const changedBy = auth.currentUser?.displayName || auth.currentUser?.email || "Unknown user";
 
       if (!name) {
         alert("Please enter the member name.");
         return;
       }
 
-      const payload = {
-        name,
-        street,
-        phone: $("editPhone").value.trim(),
-        [`years.${yearKey}`]: {
+      try {
+        if (currentYear === 2025) {
+          // Keep historical 2025 collection values read-only. Phone is shared
+          // contact information, so it may still be added/edited here.
+          if (!id) return;
+          await updateDoc(doc(db, "members", String(id)), { phone });
+          closeModal();
+          setSyncStatus("Saved • syncing…", true);
+          return;
+        }
+
+        const yearData = {
           bill_no: $("editBillNoYear").value.trim(),
           paid: Number($("editPaidYear").value) || 0,
           is_due: currentIsDue,
           date_paid: $("editDatePaid").value || "",
-          remarks: $("editRemarks").value || ""
-        },
-        updatedAt: serverTimestamp(),
-        lastChangedBy: auth.currentUser?.displayName || auth.currentUser?.email || "Unknown user"
-      };
+          remarks: $("editRemarks").value || "",
+          lastChangedBy: changedBy
+        };
 
-      try {
         if (id) {
-          await updateDoc(doc(db, "members", String(id)), payload);
-          await recordAudit("updated", String(id), name, yearKey, payload.lastChangedBy);
+          await updateDoc(doc(db, "members", String(id)), {
+            name,
+            street,
+            phone,
+            [`years.${yearKey}`]: yearData,
+            updatedAt: serverTimestamp()
+          });
+          await recordAudit("updated", String(id), name, yearKey, changedBy);
         } else {
           const newId = crypto.randomUUID();
           const newMember = {
@@ -859,17 +872,17 @@
             bill_no: $("editBillNo").value.trim(),
             name,
             street,
-            phone: $("editPhone").value.trim(),
+            phone,
             paid_2025: 0,
             years: {
-              [yearKey]: payload[`years.${yearKey}`]
+              [yearKey]: yearData
             },
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            lastChangedBy: payload.lastChangedBy
+            lastChangedBy: changedBy
           };
           await setDoc(doc(db, "members", newId), newMember);
-          await recordAudit("created", newId, name, yearKey, payload.lastChangedBy);
+          await recordAudit("created", newId, name, yearKey, changedBy);
         }
 
         closeModal();
