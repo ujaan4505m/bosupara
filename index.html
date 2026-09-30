@@ -1318,7 +1318,11 @@
           message = "This website domain is not authorized in Firebase Authentication.";
         }
 
-        $("loginError").textContent = "Google sign-in failed: " + message;
+        $("loginError").innerHTML =
+          "<b>Google sign-in failed</b><br>" +
+          "Code: <code>" + esc(code || "unknown") + "</code><br>" +
+          "Message: " + esc(message) + "<br><br>" +
+          "<small>Please send me a screenshot of this exact error.</small>";
         setSyncStatus("Sign-in failed");
       }
     }
