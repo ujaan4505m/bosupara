@@ -199,6 +199,7 @@
     .report-table th{background:#f7f7f7;color:#5f6368;font-weight:700}
     .report-table tr:last-child td{border-bottom:none}
     .report-empty{padding:18px;text-align:center;color:#777;background:#fafafa;border-radius:9px;margin-top:12px}
+    .dashboard-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.dashboard-stat{padding:10px;text-align:center;border:1px solid #e9ecef;border-radius:9px}.dashboard-stat b{display:block;font-size:1.05rem}.dashboard-stat small{color:#6c757d}.dashboard-stat.wide{grid-column:1/-1}@media(max-width:600px){.dashboard-grid{grid-template-columns:1fr 1fr}}
     .report-note{font-size:.75rem;color:#795548;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:9px 10px;margin-top:10px}
     @media(max-width:600px){.report-actions{grid-template-columns:1fr}.report-summary{align-items:flex-start;flex-direction:column}}
     @media(max-width:600px){
@@ -262,6 +263,8 @@
       <div class="small-muted" id="yearHelp"></div>
     </div>
 
+    <div class="card"><div class="search-title">📊 Collection Dashboard</div><div id="dashboardStats" class="dashboard-grid"></div></div>
+
     <div class="card">
       <div class="search-title">🔍 Advanced Initial Search</div>
       <div class="initial-search-grid">
@@ -284,6 +287,7 @@
         <label>Filter Collection by Date Paid</label>
         <input type="date" id="dateFilter" onchange="applyFilters()">
       </div>
+      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="pending">Pending</option></select></div>
     </div>
 
     <div class="stats-bar">
@@ -351,6 +355,7 @@
         <div class="form-group" style="margin-bottom:12px;">
           <label id="yearPaidLabel">2026 PAID (₹)</label>
           <input type="number" id="editPaidYear" min="0" step="1" placeholder="Enter amount paid" oninput="updateDueStatusOnInput()">
+          <button type="button" id="clearPaidBtn" class="btn btn-outline small-btn" style="display:none;margin-top:6px;" onclick="clearPaidMark()">Clear Paid Mark</button>
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -621,6 +626,7 @@
       const sn = $("snInitial").value.trim().toLowerCase();
       const queryText = $("generalSearch").value.trim().toLowerCase();
       const dateFilter = $("dateFilter").value;
+      const statusFilter = $("statusFilter").value;
 
       const filtered = chandaData.filter(item => {
         if (fn || sn) {
@@ -636,16 +642,25 @@
         if (queryText) {
           const haystack = [
             item.name, item.street, item.bill_no,
-            yd.bill_no
+            yd.bill_no, item.phone
           ].join(" ").toLowerCase();
           if (!haystack.includes(queryText)) return false;
         }
 
         if (dateFilter && yd.date_paid !== dateFilter) return false;
+        const status = Number(yd.paid || 0) > 0 ? "paid" : (yd.is_due ? "due" : "pending");
+        if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       });
 
+      renderDashboard();
       renderList(filtered);
+    }
+
+    function renderDashboard() {
+      let paid=0,due=0,pending=0,total=0;
+      chandaData.forEach(item=>{const yd=getYearData(item); const amount=Number(yd.paid||0); total+=amount; if(amount>0)paid++; else if(yd.is_due)due++; else pending++;});
+      $("dashboardStats").innerHTML=`<div class="dashboard-stat"><b>${chandaData.length}</b><small>Total Members</small></div><div class="dashboard-stat"><b>${paid}</b><small>Paid</small></div><div class="dashboard-stat"><b>${due}</b><small>Due</small></div><div class="dashboard-stat"><b>${pending}</b><small>Pending</small></div><div class="dashboard-stat wide"><b>₹${total.toLocaleString("en-IN")}</b><small>Total Collected in ${currentYear}</small></div>`;
     }
 
     function renderList(list) {
@@ -774,12 +789,15 @@
       updateDueButtonText();
     }
 
+    function clearPaidMark(){ $("editPaidYear").value=""; $("editDatePaid").value=""; currentIsDue=false; updateDueButtonText(); updateClearPaidButton(); }
+    function updateClearPaidButton(){const b=$("clearPaidBtn"); if(b)b.style.display=(Number($("editPaidYear").value)||0)>0?"inline-flex":"none";}
     function updateDueStatusOnInput() {
       const val = parseFloat($("editPaidYear").value) || 0;
       if (val > 0) {
         currentIsDue = false;
         updateDueButtonText();
       }
+      updateClearPaidButton();
     }
 
     function updateDueButtonText() {
