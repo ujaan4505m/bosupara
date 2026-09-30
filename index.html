@@ -479,7 +479,6 @@
     const auth = getAuth(appFirebase);
     const db = getFirestore(appFirebase);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
 
     // These are the original pre-inserted records from the uploaded file.
     // They are used only to seed the shared database once.
@@ -1298,17 +1297,17 @@
 
     async function signIn() {
       try {
-        $("loginError").textContent = "Opening Google sign-in…";
-        setSyncStatus("Signing in…");
-
-        // Redirect is more reliable on phones and when the browser blocks
-        // Firebase authentication popups.
-        await signInWithRedirect(auth, provider);
+        $("loginError").textContent = "";
+        await signInWithPopup(auth, provider);
       } catch (err) {
-        console.error("Google sign-in failed:", err);
-        $("loginError").textContent =
-          "Google sign-in failed: " + (err?.message || "Please try again.");
-        setSyncStatus("Sign-in failed");
+        console.warn("Popup sign-in failed:", err);
+        try {
+          await signInWithRedirect(auth, provider);
+        } catch (redirectErr) {
+          console.error(redirectErr);
+          $("loginError").textContent =
+            "Sign-in failed. Add your deployed domain to Firebase Authentication → Authorized domains.";
+        }
       }
     }
 
