@@ -1073,15 +1073,23 @@
       setSyncStatus("Access denied");
       if (unsubscribeMembers) unsubscribeMembers();
 
-      // Show an immediate browser popup so an unauthorized account always
-      // receives a clear denial message before being signed out.
-      alert(deniedMessage);
-
+      // Keep the unauthorized user on the login screen so the denial is
+      // visible even if the browser blocks native alert dialogs.
       try {
-        await signOut(auth);
+        alert(deniedMessage);
       } catch (err) {
-        console.warn("Could not sign out unauthorized user:", err);
+        console.warn("Browser alert was unavailable:", err);
       }
+
+      // Sign out after the denial has been displayed. A short delay also
+      // prevents the auth-state change from immediately replacing the message.
+      setTimeout(async () => {
+        try {
+          await signOut(auth);
+        } catch (err) {
+          console.warn("Could not sign out unauthorized user:", err);
+        }
+      }, 1200);
     }
 
     async function signIn() {
