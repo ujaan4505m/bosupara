@@ -286,8 +286,8 @@
       </div>
 
       <div class="form-group" style="margin-bottom: 10px;">
-        <label>Search Name, Bill No., or Street</label>
-        <input type="text" id="generalSearch" placeholder="Type name, street or bill no..." oninput="applyFilters()">
+        <label>Search Name, Bill No., Street, or Phone</label>
+        <input type="text" id="generalSearch" placeholder="Type name, street, bill no. or phone..." oninput="applyFilters()">
       </div>
 
       <div class="form-group">
@@ -842,7 +842,7 @@
     function updateClearPaidButton() {
       const btn = $("clearPaidBtn");
       if (!btn) return;
-      const hasPaid = (parseFloat($("editPaidYear").value) || 0) > 0;
+      const hasPaid = currentYear !== 2025 && (parseFloat($("editPaidYear").value) || 0) > 0;
       btn.style.display = hasPaid ? "inline-flex" : "none";
     }
 
