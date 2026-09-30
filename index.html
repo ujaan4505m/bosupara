@@ -1060,13 +1060,22 @@
     }
 
     async function rejectUnauthorizedUser(user) {
+      const deniedEmail = user?.email?.trim() || "This Google account";
+      const deniedMessage =
+        "Access denied. " + deniedEmail +
+        " is not authorized to use the Bosupara Committee database.\n\n" +
+        "Please contact the committee administrator if you need access.";
+
       accessDeniedMessagePending = true;
       $("loginScreen").style.display = "flex";
       $("app").style.display = "none";
-      $("loginError").textContent =
-        "Access denied. This Google account is not authorized to use the committee database.";
+      $("loginError").textContent = deniedMessage.replace("\n\n", " ");
       setSyncStatus("Access denied");
       if (unsubscribeMembers) unsubscribeMembers();
+
+      // Show an immediate browser popup so an unauthorized account always
+      // receives a clear denial message before being signed out.
+      alert(deniedMessage);
 
       try {
         await signOut(auth);
