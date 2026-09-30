@@ -283,6 +283,11 @@
         <input type="text" id="generalSearch" placeholder="Type name, street or bill no..." oninput="applyFilters()">
       </div>
 
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label>📞 Phone Number Search</label>
+        <input type="tel" id="phoneSearch" inputmode="tel" placeholder="Enter phone number..." oninput="applyFilters()">
+      </div>
+
       <div class="form-group">
         <label>Filter Collection by Date Paid</label>
         <input type="date" id="dateFilter" onchange="applyFilters()">
@@ -625,6 +630,7 @@
       const fn = $("fnInitial").value.trim().toLowerCase();
       const sn = $("snInitial").value.trim().toLowerCase();
       const queryText = $("generalSearch").value.trim().toLowerCase();
+      const phoneQuery = $("phoneSearch").value.trim().toLowerCase();
       const dateFilter = $("dateFilter").value;
       const statusFilter = $("statusFilter").value;
 
@@ -645,6 +651,12 @@
             yd.bill_no, item.phone
           ].join(" ").toLowerCase();
           if (!haystack.includes(queryText)) return false;
+        }
+
+        if (phoneQuery) {
+          const phone = String(item.phone ?? "").replace(/\\D/g, "").toLowerCase();
+          const searchPhone = phoneQuery.replace(/\\D/g, "");
+          if (!phone || !phone.includes(searchPhone)) return false;
         }
 
         if (dateFilter && yd.date_paid !== dateFilter) return false;
