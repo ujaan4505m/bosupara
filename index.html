@@ -648,7 +648,7 @@
         }
 
         if (dateFilter && yd.date_paid !== dateFilter) return false;
-        const status = Number(yd.paid || 0) > 0 ? "paid" : (yd.is_due ? "due" : "pending");
+        const status = yd.is_due ? "due" : (Number(yd.paid || 0) > 0 ? "paid" : "pending");
         if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       });
@@ -659,7 +659,7 @@
 
     function renderDashboard() {
       let paid=0,due=0,pending=0,total=0;
-      chandaData.forEach(item=>{const yd=getYearData(item); const amount=Number(yd.paid||0); total+=amount; if(amount>0)paid++; else if(yd.is_due)due++; else pending++;});
+      chandaData.forEach(item=>{const yd=getYearData(item); const amount=Number(yd.paid||0); if(yd.is_due){due++;} else if(amount>0){paid++; total+=amount;} else {pending++;}});
       $("dashboardStats").innerHTML=`<div class="dashboard-stat"><b>${chandaData.length}</b><small>Total Members</small></div><div class="dashboard-stat"><b>${paid}</b><small>Paid</small></div><div class="dashboard-stat"><b>${due}</b><small>Due</small></div><div class="dashboard-stat"><b>${pending}</b><small>Pending</small></div><div class="dashboard-stat wide"><b>₹${total.toLocaleString("en-IN")}</b><small>Total Collected in ${currentYear}</small></div>`;
     }
 
@@ -793,10 +793,6 @@
     function updateClearPaidButton(){const b=$("clearPaidBtn"); if(b)b.style.display=(Number($("editPaidYear").value)||0)>0?"inline-flex":"none";}
     function updateDueStatusOnInput() {
       const val = parseFloat($("editPaidYear").value) || 0;
-      if (val > 0) {
-        currentIsDue = false;
-        updateDueButtonText();
-      }
       updateClearPaidButton();
     }
 
@@ -908,7 +904,7 @@
         for (const [yearKey, yd] of Object.entries(item.years || {})) {
           const amount = Number(yd?.paid || 0);
           const date = yd?.date_paid || "";
-          if (amount <= 0 || !date || date < from || date > to) continue;
+          if (yd?.is_due || amount <= 0 || !date || date < from || date > to) continue;
           rows.push({name:item.name || "Unnamed", year:Number(yearKey), amount, date});
           total += amount;
         }
@@ -964,8 +960,8 @@
 
       const rows = chandaData.map(item => {
         const yd = getYearData(item, year);
-        return {name:item.name || "Unnamed", amount:Number(yd.paid || 0), date:yd.date_paid || ""};
-      }).filter(r => r.amount > 0 && r.amount >= min && r.amount <= max)
+        return {name:item.name || "Unnamed", amount:Number(yd.paid || 0), isDue:Boolean(yd.is_due), date:yd.date_paid || ""};
+      }).filter(r => !r.isDue && r.amount > 0 && r.amount >= min && r.amount <= max)
         .sort((a,b) => a.amount - b.amount || a.name.localeCompare(b.name));
 
       const total = rows.reduce((sum,r) => sum + r.amount, 0);
@@ -1192,7 +1188,7 @@
       closeYearModal, openEditModal, openAddModal, closeModal, toggleDueState,
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist,
-      updateDueStatusOnInput, saveMember, applyFilters, exportAllExcel,
+      updateDueStatusOnInput, clearPaidMark, saveMember, applyFilters, exportAllExcel,
       exportVisibleExcel
     });
   </script>
