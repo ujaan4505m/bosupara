@@ -1032,6 +1032,28 @@
       downloadWorkbook(rows, `Bosupara_Chanda_Current_View_${currentYear}.xlsx`);
     }
 
+    async function isAuthorizedUser(user) {
+      if (!user?.email) return false;
+      const email = user.email.trim().toLowerCase();
+      const accessRef = doc(db, "authorized_users", email);
+      const accessSnap = await getDoc(accessRef);
+      return accessSnap.exists() && accessSnap.data()?.allowed === true;
+    }
+
+    async function rejectUnauthorizedUser(user) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn("Could not sign out unauthorized user:", err);
+      }
+      $("loginScreen").style.display = "flex";
+      $("app").style.display = "none";
+      $("loginError").textContent =
+        "Access denied. This Google account is not authorized to use the committee database.";
+      setSyncStatus("Access denied");
+      if (unsubscribeMembers) unsubscribeMembers();
+    }
+
     async function signIn() {
       try {
         $("loginError").textContent = "";
@@ -1056,22 +1078,33 @@
       if (!user) {
         $("loginScreen").style.display = "flex";
         $("app").style.display = "none";
+        $("loginError").textContent = "";
         setSyncStatus("Signed out");
         if (unsubscribeMembers) unsubscribeMembers();
         return;
       }
 
-      $("loginScreen").style.display = "none";
-      $("app").style.display = "block";
-      $("userName").textContent = user.displayName || user.email || "User";
-
       try {
+        const authorized = await isAuthorizedUser(user);
+        if (!authorized) {
+          await rejectUnauthorizedUser(user);
+          return;
+        }
+
+        $("loginScreen").style.display = "none";
+        $("app").style.display = "block";
+        $("userName").textContent = user.displayName || user.email || "User";
+
         await seedDatabaseIfNeeded();
         subscribeMembers();
       } catch (err) {
         console.error(err);
-        setSyncStatus("Database setup failed");
-        alert("Firebase database setup failed. Check your Firebase configuration and Firestore rules.");
+        $("loginScreen").style.display = "flex";
+        $("app").style.display = "none";
+        setSyncStatus("Authorization check failed");
+        $("loginError").textContent =
+          "Could not verify access. Please try again or contact the committee administrator.";
+        try { await signOut(auth); } catch (_) {}
       }
     });
 
