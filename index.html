@@ -200,6 +200,11 @@
     .report-table tr:last-child td{border-bottom:none}
     .report-empty{padding:18px;text-align:center;color:#777;background:#fafafa;border-radius:9px;margin-top:12px}
     .report-note{font-size:.75rem;color:#795548;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:9px 10px;margin-top:10px}
+    .dashboard-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .dashboard-stat{background:#fafafa;border:1px solid #e9ecef;border-radius:9px;padding:10px;text-align:center}
+    .dashboard-stat .value{font-size:1.05rem;font-weight:800;color:var(--primary)}
+    .dashboard-stat .label{font-size:.7rem;color:var(--text-muted);margin-top:3px}
+    @media(max-width:600px){.dashboard-grid{grid-template-columns:1fr 1fr}}
     @media(max-width:600px){.report-actions{grid-template-columns:1fr}.report-summary{align-items:flex-start;flex-direction:column}}
     @media(max-width:600px){
       .header-row{align-items:flex-start}
@@ -263,6 +268,11 @@
     </div>
 
     <div class="card">
+      <div class="search-title">📊 Collection Dashboard</div>
+      <div id="dashboardStats" class="dashboard-grid"></div>
+    </div>
+
+    <div class="card">
       <div class="search-title">🔍 Advanced Initial Search</div>
       <div class="initial-search-grid">
         <div class="form-group">
@@ -283,6 +293,16 @@
       <div class="form-group">
         <label>Filter Collection by Date Paid</label>
         <input type="date" id="dateFilter" onchange="applyFilters()">
+      </div>
+
+      <div class="form-group">
+        <label>Payment Status</label>
+        <select id="statusFilter" onchange="applyFilters()">
+          <option value="all">All</option>
+          <option value="paid">Paid</option>
+          <option value="due">Due</option>
+          <option value="pending">Pending</option>
+        </select>
       </div>
     </div>
 
@@ -351,6 +371,7 @@
         <div class="form-group" style="margin-bottom:12px;">
           <label id="yearPaidLabel">2026 PAID (₹)</label>
           <input type="number" id="editPaidYear" min="0" step="1" placeholder="Enter amount paid" oninput="updateDueStatusOnInput()">
+          <button type="button" id="clearPaidBtn" class="btn btn-outline small-btn" style="margin-top:6px;display:none;" onclick="clearPaidMark()">Clear Paid Mark</button>
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -621,6 +642,7 @@
       const sn = $("snInitial").value.trim().toLowerCase();
       const queryText = $("generalSearch").value.trim().toLowerCase();
       const dateFilter = $("dateFilter").value;
+      const statusFilter = $("statusFilter").value;
 
       const filtered = chandaData.filter(item => {
         if (fn || sn) {
@@ -636,16 +658,52 @@
         if (queryText) {
           const haystack = [
             item.name, item.street, item.bill_no,
-            yd.bill_no
+            yd.bill_no, item.phone
           ].join(" ").toLowerCase();
           if (!haystack.includes(queryText)) return false;
         }
 
         if (dateFilter && yd.date_paid !== dateFilter) return false;
+
+        const status = getPaymentStatus(yd);
+        if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       });
 
+      renderDashboard();
       renderList(filtered);
+    }
+
+    function getPaymentStatus(yd) {
+      if (Number(yd.paid || 0) > 0) return "paid";
+      if (Boolean(yd.is_due)) return "due";
+      return "pending";
+    }
+
+    function renderDashboard() {
+      const totalMembers = chandaData.length;
+      let paidCount = 0;
+      let dueCount = 0;
+      let pendingCount = 0;
+      let collected = 0;
+
+      for (const item of chandaData) {
+        const yd = getYearData(item);
+        const amount = Number(yd.paid || 0);
+        const status = getPaymentStatus(yd);
+        collected += amount;
+        if (status === "paid") paidCount++;
+        else if (status === "due") dueCount++;
+        else pendingCount++;
+      }
+
+      $("dashboardStats").innerHTML = `
+        <div class="dashboard-stat"><div class="value">${totalMembers}</div><div class="label">Total Members</div></div>
+        <div class="dashboard-stat"><div class="value">${paidCount}</div><div class="label">Paid</div></div>
+        <div class="dashboard-stat"><div class="value">${dueCount}</div><div class="label">Due</div></div>
+        <div class="dashboard-stat"><div class="value">${pendingCount}</div><div class="label">Pending</div></div>
+        <div class="dashboard-stat" style="grid-column:1/-1;"><div class="value">₹${collected.toLocaleString("en-IN")}</div><div class="label">Total Collected in ${currentYear}</div></div>
+      `;
     }
 
     function renderList(list) {
@@ -661,13 +719,10 @@
       $("memberList").innerHTML = list.map(item => {
         const yd = getYearData(item);
         let badge = '<span class="badge badge-pending">Pending</span>';
-        if (currentYear === 2025) {
-          badge = `<span class="badge badge-paid">₹${yd.paid}</span>`;
-        } else if (yd.is_due) {
-          badge = '<span class="badge badge-due">DUE</span>';
-        } else if (yd.paid > 0) {
+        if (getPaymentStatus(yd) === "paid") {
           badge = `<span class="badge badge-paid">PAID: ₹${yd.paid}</span>`;
-        }
+        } else if (getPaymentStatus(yd) === "due") {
+          badge = '<span class="badge badge-due">DUE</span>';
 
         const change = item.lastChangedBy && item.lastChangedBy !== "Initial imported data"
           ? `<p class="last-change">Last change by <b>${esc(item.lastChangedBy)}</b></p>` : "";
@@ -703,6 +758,7 @@
       $("editBillNoYear").value = yd.bill_no ?? "";
       $("editPaidYear").value = yd.paid || "";
       $("editDatePaid").value = yd.date_paid || "";
+      updateClearPaidButton();
       $("editRemarks").value = yd.remarks || "";
 
       const readOnlyYear = currentYear === 2025;
@@ -750,6 +806,7 @@
       $("editPaidYear").value = "";
       $("editDatePaid").value = "";
       $("editRemarks").value = "";
+      updateClearPaidButton();
       $("editName").readOnly = false;
       $("editStreet").readOnly = false;
       $("editPhone").readOnly = false;
@@ -764,6 +821,7 @@
 
       currentIsDue = false;
       updateDueButtonText();
+      updateClearPaidButton();
       $("detailModal").style.display = "flex";
     }
 
@@ -776,10 +834,24 @@
 
     function updateDueStatusOnInput() {
       const val = parseFloat($("editPaidYear").value) || 0;
-      if (val > 0) {
-        currentIsDue = false;
-        updateDueButtonText();
-      }
+      if (val > 0) currentIsDue = false;
+      updateDueButtonText();
+      updateClearPaidButton();
+    }
+
+    function updateClearPaidButton() {
+      const btn = $("clearPaidBtn");
+      if (!btn) return;
+      const hasPaid = (parseFloat($("editPaidYear").value) || 0) > 0;
+      btn.style.display = hasPaid ? "inline-flex" : "none";
+    }
+
+    function clearPaidMark() {
+      $("editPaidYear").value = "";
+      $("editDatePaid").value = "";
+      currentIsDue = false;
+      updateDueButtonText();
+      updateClearPaidButton();
     }
 
     function updateDueButtonText() {
@@ -807,15 +879,19 @@
         return;
       }
 
+      const paidAmount = Number($("editPaidYear").value) || 0;
+      const effectiveIsDue = paidAmount > 0 ? false : currentIsDue;
+      const effectiveDatePaid = paidAmount > 0 ? ($("editDatePaid").value || "") : "";
+
       const payload = {
         name,
         street,
         phone: $("editPhone").value.trim(),
         [`years.${yearKey}`]: {
           bill_no: $("editBillNoYear").value.trim(),
-          paid: Number($("editPaidYear").value) || 0,
-          is_due: currentIsDue,
-          date_paid: $("editDatePaid").value || "",
+          paid: paidAmount,
+          is_due: effectiveIsDue,
+          date_paid: effectiveDatePaid,
           remarks: $("editRemarks").value || ""
         },
         updatedAt: serverTimestamp(),
@@ -1046,17 +1122,19 @@
       const sn = $("snInitial").value.trim().toLowerCase();
       const qtext = $("generalSearch").value.trim().toLowerCase();
       const dateFilter = $("dateFilter").value;
+      const statusFilter = $("statusFilter").value;
 
       const rows = chandaData.filter(item => {
         const parts = (item.name || "").trim().split(/\s+/);
         const first = parts[0] || "";
         const last = parts.length > 1 ? parts[parts.length - 1] : "";
         const yd = getYearData(item);
-        const haystack = [item.name,item.street,item.bill_no,yd.bill_no].join(" ").toLowerCase();
+        const haystack = [item.name,item.street,item.bill_no,yd.bill_no,item.phone].join(" ").toLowerCase();
         if (fn && !first.toLowerCase().startsWith(fn)) return false;
         if (sn && !last.toLowerCase().startsWith(sn)) return false;
         if (qtext && !haystack.includes(qtext)) return false;
         if (dateFilter && yd.date_paid !== dateFilter) return false;
+        if (statusFilter !== "all" && getPaymentStatus(yd) !== statusFilter) return false;
         return true;
       }).map(flattenForExcel);
 
@@ -1174,7 +1252,7 @@
       closeYearModal, openEditModal, openAddModal, closeModal, toggleDueState,
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist,
-      updateDueStatusOnInput, saveMember, applyFilters, exportAllExcel,
+      updateDueStatusOnInput, clearPaidMark, saveMember, applyFilters, exportAllExcel,
       exportVisibleExcel
     });
   </script>
