@@ -67,7 +67,7 @@
     .form-group { display: flex; flex-direction: column; gap: 4px; }
     .form-group label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
 
-    input[type="text"], input[type="number"], input[type="date"], textarea {
+    input[type="text"], input[type="number"], input[type="date"], input[type="tel"], textarea {
       width: 100%;
       padding: 10px 12px;
       border: 1px solid #ced4da;
@@ -331,6 +331,11 @@
         <div class="form-group" style="margin-bottom:12px;">
           <label>Street Name</label>
           <input type="text" id="editStreet">
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>Phone Number (Optional)</label>
+          <input type="tel" id="editPhone" inputmode="tel" maxlength="15" placeholder="Enter phone number (optional)" autocomplete="tel">
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -693,6 +698,7 @@
       $("editBillNo").value = item.bill_no ?? "";
       $("editName").value = item.name ?? "";
       $("editStreet").value = item.street ?? "";
+      $("editPhone").value = item.phone ?? "";
       $("editPaid2025").textContent = `₹${Number(item.paid_2025 || 0)}`;
       $("editBillNoYear").value = yd.bill_no ?? "";
       $("editPaidYear").value = yd.paid || "";
@@ -702,6 +708,7 @@
       const readOnlyYear = currentYear === 2025;
       $("editName").readOnly = readOnlyYear;
       $("editStreet").readOnly = readOnlyYear;
+      $("editPhone").readOnly = readOnlyYear;
       $("editBillNoYear").readOnly = readOnlyYear;
       $("editPaidYear").readOnly = readOnlyYear;
       $("editDatePaid").readOnly = readOnlyYear;
@@ -737,6 +744,7 @@
       $("editBillNo").value = "";
       $("editName").value = "";
       $("editStreet").value = "";
+      $("editPhone").value = "";
       $("editPaid2025").textContent = "₹0";
       $("editBillNoYear").value = "";
       $("editPaidYear").value = "";
@@ -744,6 +752,7 @@
       $("editRemarks").value = "";
       $("editName").readOnly = false;
       $("editStreet").readOnly = false;
+      $("editPhone").readOnly = false;
       $("editBillNoYear").readOnly = false;
       $("editPaidYear").readOnly = false;
       $("editDatePaid").readOnly = false;
@@ -801,6 +810,7 @@
       const payload = {
         name,
         street,
+        phone: $("editPhone").value.trim(),
         [`years.${yearKey}`]: {
           bill_no: $("editBillNoYear").value.trim(),
           paid: Number($("editPaidYear").value) || 0,
@@ -823,6 +833,7 @@
             bill_no: $("editBillNo").value.trim(),
             name,
             street,
+            phone: $("editPhone").value.trim(),
             paid_2025: 0,
             years: {
               [yearKey]: payload[`years.${yearKey}`]
@@ -996,6 +1007,7 @@
         "2025 Bill No": item.bill_no ?? "",
         "Name": item.name ?? "",
         "Street": item.street ?? "",
+        "Phone Number": item.phone ?? "",
         "2025 Paid": Number(item.paid_2025 || 0)
       };
 
