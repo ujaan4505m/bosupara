@@ -239,7 +239,10 @@
       <p style="margin-bottom:14px;color:#6c757d;">
         Sign in to access the shared committee database. Your Google account name will be recorded with changes.
       </p>
-      <button class="btn" type="button" id="googleSignInBtn">Continue with Google</button>
+      <button class="btn" type="button" id="googleSignInBtn"
+        onclick="document.getElementById('loginError').textContent='Button clicked — starting Google sign-in…'; if (typeof window.signIn === 'function') { window.signIn(); } else { document.getElementById('loginError').textContent='Login script did not load. Please reload the page.'; }">
+        Continue with Google
+      </button>
       <p id="loginError" class="error-text"></p>
     </div>
   </div>
