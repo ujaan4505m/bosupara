@@ -462,6 +462,8 @@
     let currentYear = new Date().getFullYear();
     if (currentYear < 2025) currentYear = 2025;
     let availableYears = [];
+    let configuredYears = [];
+    let accessDeniedMessagePending = false;
     let currentIsDue = false;
     let unsubscribeMembers = null;
     let isSeeding = false;
@@ -530,6 +532,13 @@
       isSeeding = false;
     }
 
+    async function loadConfiguredYears() {
+      const metaSnap = await getDoc(doc(db, "committee_meta", "database"));
+      configuredYears = Array.isArray(metaSnap.data()?.configuredYears)
+        ? metaSnap.data().configuredYears.map(Number).filter(Number.isFinite)
+        : [];
+    }
+
     function subscribeMembers() {
       if (unsubscribeMembers) unsubscribeMembers();
 
@@ -551,12 +560,12 @@
     }
 
     function buildYearList() {
-      const years = new Set([2025]);
+      const years = new Set([2025, ...configuredYears]);
       chandaData.forEach(item => {
         Object.keys(item.years || {}).forEach(y => years.add(Number(y)));
       });
-      // Also show the current year and the next few years so the app remains useful
-      // without needing a code change every year.
+      // Also show the current year and the next few years. User-added years
+      // are persisted in committee_meta so they survive reloads and new devices.
       const now = new Date().getFullYear();
       for (let y = 2025; y <= Math.max(now + 2, currentYear); y++) years.add(y);
 
@@ -960,9 +969,19 @@
 
       // Years are created logically by selecting them; no mass rewrite of 423
       // records is needed. This keeps the database scalable for future years.
-      if (!availableYears.includes(year)) {
-        availableYears.push(year);
-        availableYears.sort((a,b)=>a-b);
+      if (!configuredYears.includes(year)) {
+        configuredYears.push(year);
+        configuredYears.sort((a,b)=>a-b);
+        try {
+          await setDoc(doc(db, "committee_meta", "database"), {
+            configuredYears,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (err) {
+          console.error(err);
+          alert("Could not save the new year. Check your Firebase permissions.");
+          return;
+        }
       }
       currentYear = year;
       buildYearList();
@@ -1041,17 +1060,19 @@
     }
 
     async function rejectUnauthorizedUser(user) {
-      try {
-        await signOut(auth);
-      } catch (err) {
-        console.warn("Could not sign out unauthorized user:", err);
-      }
+      accessDeniedMessagePending = true;
       $("loginScreen").style.display = "flex";
       $("app").style.display = "none";
       $("loginError").textContent =
         "Access denied. This Google account is not authorized to use the committee database.";
       setSyncStatus("Access denied");
       if (unsubscribeMembers) unsubscribeMembers();
+
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn("Could not sign out unauthorized user:", err);
+      }
     }
 
     async function signIn() {
@@ -1078,8 +1099,15 @@
       if (!user) {
         $("loginScreen").style.display = "flex";
         $("app").style.display = "none";
-        $("loginError").textContent = "";
-        setSyncStatus("Signed out");
+        if (!accessDeniedMessagePending) {
+          $("loginError").textContent = "";
+          setSyncStatus("Signed out");
+        } else {
+          accessDeniedMessagePending = false;
+          $("loginError").textContent =
+            "Access denied. This Google account is not authorized to use the committee database.";
+          setSyncStatus("Access denied");
+        }
         if (unsubscribeMembers) unsubscribeMembers();
         return;
       }
@@ -1096,6 +1124,7 @@
         $("userName").textContent = user.displayName || user.email || "User";
 
         await seedDatabaseIfNeeded();
+        await loadConfiguredYears();
         subscribeMembers();
       } catch (err) {
         console.error(err);
