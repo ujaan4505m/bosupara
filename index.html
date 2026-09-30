@@ -239,10 +239,7 @@
       <p style="margin-bottom:14px;color:#6c757d;">
         Sign in to access the shared committee database. Your Google account name will be recorded with changes.
       </p>
-      <button class="btn" type="button" id="googleSignInBtn"
-        onclick="document.getElementById('loginError').textContent='Button clicked — starting Google sign-in…'; if (typeof window.signIn === 'function') { window.signIn(); } else { document.getElementById('loginError').textContent='Login script did not load. Please reload the page.'; }">
-        Continue with Google
-      </button>
+      <button class="btn" onclick="signIn()">Continue with Google</button>
       <p id="loginError" class="error-text"></p>
     </div>
   </div>
@@ -457,8 +454,8 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import {
-      getAuth, GoogleAuthProvider, signInWithPopup,
-      onAuthStateChanged, signOut
+      getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+      getRedirectResult, onAuthStateChanged, signOut
     } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
     import {
       getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
@@ -483,10 +480,6 @@
     const db = getFirestore(appFirebase);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-
-    // Bind the Google button directly after Firebase Auth initializes.
-    // This avoids relying on an inline onclick handler inside the module script.
-    document.getElementById("googleSignInBtn")?.addEventListener("click", signIn);
 
     // These are the original pre-inserted records from the uploaded file.
     // They are used only to seed the shared database once.
@@ -1308,28 +1301,13 @@
         $("loginError").textContent = "Opening Google sign-in…";
         setSyncStatus("Signing in…");
 
-        // Use popup sign-in here. The site is hosted on Cloudflare Pages,
-        // where Firebase redirect sign-in can be blocked by browser
-        // cross-origin storage restrictions.
-        await signInWithPopup(auth, provider);
+        // Redirect is more reliable on phones and when the browser blocks
+        // Firebase authentication popups.
+        await signInWithRedirect(auth, provider);
       } catch (err) {
         console.error("Google sign-in failed:", err);
-        const code = err?.code || "";
-        let message = err?.message || "Please try again.";
-
-        if (code === "auth/popup-blocked") {
-          message = "Google sign-in popup was blocked. Please allow popups for this site and try again.";
-        } else if (code === "auth/popup-closed-by-user") {
-          message = "Google sign-in was closed. Please try again.";
-        } else if (code === "auth/unauthorized-domain") {
-          message = "This website domain is not authorized in Firebase Authentication.";
-        }
-
-        $("loginError").innerHTML =
-          "<b>Google sign-in failed</b><br>" +
-          "Code: <code>" + esc(code || "unknown") + "</code><br>" +
-          "Message: " + esc(message) + "<br><br>" +
-          "<small>Please send me a screenshot of this exact error.</small>";
+        $("loginError").textContent =
+          "Google sign-in failed: " + (err?.message || "Please try again.");
         setSyncStatus("Sign-in failed");
       }
     }
@@ -1380,6 +1358,7 @@
       }
     });
 
+    getRedirectResult(auth).catch(err => console.warn("Redirect result:", err));
 
     // Expose UI functions used by inline onclick handlers.
     Object.assign(window, {
