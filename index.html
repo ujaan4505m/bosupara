@@ -187,7 +187,7 @@
     .small-btn{width:auto!important;padding:8px 12px!important;white-space:nowrap}
     .stats-actions{display:flex;gap:7px}
     .last-change{font-size:.72rem!important;color:#795548!important;margin-top:4px}
-    .change-box{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:9px 11px;font-size:.78rem;color:#6d4c41;margin-bottom:12px}
+    .change-box{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:9px 11px;font-size:.78rem;color:#6d4c41;margin-bottom:12px}.history-list{margin-top:12px}.history-entry{padding:0 0 12px;margin-bottom:12px;border-bottom:1px solid #eee}.history-entry:last-child{border-bottom:none;margin-bottom:0}.history-who{font-size:.84rem;color:#343a40}.history-when{font-size:.72rem;color:#6c757d;margin-top:4px}.history-details{font-size:.78rem;color:#5f6368;margin-top:4px;line-height:1.35}.history-empty{padding:18px;text-align:center;color:#777;background:#fafafa;border-radius:9px}
     .error-text{color:#dc3545;font-size:.8rem;margin-top:10px}
     .login-card{max-width:420px}
     .report-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -378,13 +378,24 @@
           <textarea id="editRemarks" rows="2" placeholder="Notes e.g. Paid via UPI, will pay rest later"></textarea>
         </div>
 
-        <div id="lastChangeBox" class="change-box" style="display:none;"></div>
+        <div id="lastChangeBox" class="change-box" style="display:none;"></div>\n        <button type="button" id="historyBtn" class="btn btn-outline small-btn" style="margin-bottom:12px;" onclick="openChangeHistory()">View Full Change History</button>
 
         <div class="flex-gap">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
           <button type="submit" class="btn" id="saveBtn">Save Entry</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="historyModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🕘 Change History</h2>
+        <button class="close-btn" onclick="closeChangeHistory()">&times;</button>
+      </div>
+      <p id="historyMemberName" class="small-muted"></p>
+      <div id="historyResults" class="history-list"></div>
     </div>
   </div>
 
@@ -759,13 +770,15 @@
         changeBox.innerHTML =
           `Last change recorded in ${currentYear} by <b>${esc(yd.lastChangedBy)}</b>` +
           (yd.lastChangeDetails ? `<br><span style="display:inline-block;margin-top:4px;">${esc(yd.lastChangeDetails)}</span>` : "") +
-          ".";
+          `<div id="lastChangeWhen" class="history-when">Loading date & time…</div>`;
       } else {
         changeBox.style.display = "none";
       }
 
+      $("historyBtn").style.display = "inline-flex";
       $("modalTitle").textContent = `${item.name || "Member"} • ${currentYear}`;
       $("detailModal").style.display = "flex";
+      loadLastChangeTimestamp(item.id, currentYear);
     }
 
     function openAddModal() {
@@ -794,7 +807,7 @@
       $("dueToggleBtn").disabled = false;
       $("saveBtn").style.display = "inline-flex";
       $("modalTitle").textContent = `New Member • ${currentYear}`;
-      $("lastChangeBox").style.display = "none";
+      $("lastChangeBox").style.display = "none";\n      $("historyBtn").style.display = "none";
 
       currentIsDue = false;
       updateDueButtonText();
@@ -953,6 +966,82 @@
         console.error(err);
         alert("Save failed. Check your internet connection and Firebase permissions.");
       }
+    }
+
+    function formatAuditTimestamp(value) {
+      if (!value) return "";
+      let date = null;
+      if (typeof value?.toDate === "function") date = value.toDate();
+      else if (value instanceof Date) date = value;
+      else if (typeof value === "string") date = new Date(value);
+      if (!date || Number.isNaN(date.getTime())) return "";
+      return new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+      }).format(date);
+    }
+
+    async function getMemberAuditHistory(memberId, year) {
+      const snap = await getDocs(collection(db, "audit_logs"));
+      return snap.docs
+        .map(d => d.data())
+        .filter(log => String(log.memberId) === String(memberId) && Number(log.year) === Number(year))
+        .sort((a,b) => {
+          const at = a.changedAt?.toMillis ? a.changedAt.toMillis() : 0;
+          const bt = b.changedAt?.toMillis ? b.changedAt.toMillis() : 0;
+          return bt - at;
+        });
+    }
+
+    async function loadLastChangeTimestamp(memberId, year) {
+      const target = $("lastChangeWhen");
+      if (!target) return;
+      try {
+        const history = await getMemberAuditHistory(memberId, year);
+        const latest = history[0];
+        target.textContent = latest?.changedAt ? formatAuditTimestamp(latest.changedAt) : "";
+      } catch (err) {
+        console.warn("Could not load last change time:", err);
+        target.textContent = "";
+      }
+    }
+
+    async function openChangeHistory() {
+      const memberId = $("editId").value;
+      if (!memberId) return;
+      const member = chandaData.find(x => String(x.id) === String(memberId));
+      $("historyMemberName").textContent = member?.name ? member.name + " • " + currentYear : "";
+      $("historyResults").innerHTML = '<div class="history-empty">Loading history…</div>';
+      $("historyModal").style.display = "flex";
+
+      try {
+        const history = await getMemberAuditHistory(memberId, currentYear);
+        if (!history.length) {
+          $("historyResults").innerHTML = '<div class="history-empty">No change history found for this year.</div>';
+          return;
+        }
+
+        $("historyResults").innerHTML = history.map(log => {
+          const who = esc(log.changedBy || "Unknown user");
+          const details = esc(log.details || (log.action === "created" ? "Member added" : "Record updated"));
+          const when = esc(formatAuditTimestamp(log.changedAt) || "Date & time unavailable");
+          return '<div class="history-entry">' +
+            '<div class="history-who"><b>' + who + '</b> — ' + details + '</div>' +
+            '<div class="history-when">' + when + '</div>' +
+            '</div>';
+        }).join("");
+      } catch (err) {
+        console.error(err);
+        $("historyResults").innerHTML = '<div class="history-empty">Could not load change history.</div>';
+      }
+    }
+
+    function closeChangeHistory() {
+      $("historyModal").style.display = "none";
     }
 
     async function recordAudit(action, memberId, memberName, year, userName, details = "") {
@@ -1275,7 +1364,7 @@
       signIn, signOutUser, changeYear, addUpcomingYear, confirmAddYear,
       closeYearModal, openEditModal, openAddModal, closeModal, toggleDueState,
       openRevenueReport, closeRevenueReport, generateRevenueReport,
-      openAmountShortlist, closeAmountShortlist, generateAmountShortlist,
+      openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory,
       updateDueStatusOnInput, clearPaidMark, saveMember, applyFilters, exportAllExcel,
       exportVisibleExcel
     });
