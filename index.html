@@ -381,7 +381,8 @@
           <textarea id="editRemarks" rows="2" placeholder="Notes e.g. Paid via UPI, will pay rest later"></textarea>
         </div>
 
-        <div id="lastChangeBox" class="change-box" style="display:none;"></div>\n        <button type="button" id="historyBtn" class="btn btn-outline small-btn" style="margin-bottom:12px;" onclick="openChangeHistory()">View Full Change History</button>
+        <div id="lastChangeBox" class="change-box" style="display:none;"></div>
+        <button type="button" id="historyBtn" class="btn btn-outline small-btn" style="margin-bottom:12px;" onclick="openChangeHistory()">View Full Change History</button>
 
         <div class="flex-gap">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -453,39 +454,6 @@
       </div>
     </div>
   </div>
-
-  <script type="module">
-    // Independent Google login bootstrap. This runs separately from the main app module.
-    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-
-    const loginConfig = {
-      apiKey: "AIzaSyDQ9UvBQOSK5gtGHsGOIXpSwfPuJakDcjM",
-      authDomain: "bosupara-2e7ad.firebaseapp.com",
-      projectId: "bosupara-2e7ad",
-      storageBucket: "bosupara-2e7ad.firebasestorage.app",
-      messagingSenderId: "730401606413",
-      appId: "1:730401606413:web:1c176dc31cee027561fe44"
-    };
-
-    const loginApp = getApps().find(a => a.name === "loginBootstrap")
-      || initializeApp(loginConfig, "loginBootstrap");
-    const loginAuth = getAuth(loginApp);
-    const loginProvider = new GoogleAuthProvider();
-
-    window.signIn = async function () {
-      const error = document.getElementById("loginError");
-      try {
-        if (error) error.textContent = "Opening Google sign-in…";
-        await signInWithPopup(loginAuth, loginProvider);
-      } catch (err) {
-        console.error("Google sign-in failed:", err);
-        if (error) {
-          error.textContent = "Google sign-in failed (" + (err?.code || "unknown") + "): " + (err?.message || "Unknown error");
-        }
-      }
-    };
-  </script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
