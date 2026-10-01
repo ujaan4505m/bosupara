@@ -290,7 +290,10 @@
 
       <div class="form-group">
         <label>Filter Collection by Date Paid</label>
-        <input type="date" id="dateFilter" onchange="applyFilters()">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="dateFilter" onchange="applyFilters()" style="flex:1;">
+          <button type="button" class="btn btn-outline small-btn" onclick="clearDateFilter()" title="Clear date filter">✕ Clear</button>
+        </div>
       </div>
       <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="pending">Pending</option></select></div>
     </div>
@@ -656,6 +659,21 @@
         lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? "",
         lastChangeDetails: item.years?.[String(year)]?.lastChangeDetails ?? ""
       };
+    }
+
+    function clearDateFilter() {
+      const input = $("dateFilter");
+      if (input) input.value = "";
+      applyFilters();
+    }
+
+    function formatDisplayDate(value) {
+      if (!value) return "";
+      const parts = String(value).split("-");
+      if (parts.length === 3 && /^\d{4}$/.test(parts[0])) {
+        return parts[2] + parts[1] + parts[0];
+      }
+      return String(value);
     }
 
     function applyFilters() {
@@ -1233,7 +1251,7 @@
         row[`${year} Bill No`] = yd.bill_no ?? "";
         row[`${year} Paid`] = Number(yd.paid || 0);
         row[`${year} Due`] = yd.is_due ? "DUE" : "";
-        row[`${year} Payment Date`] = yd.date_paid ?? "";
+        row[`${year} Payment Date`] = formatDisplayDate(yd.date_paid ?? "");
         row[`${year} Remarks`] = yd.remarks ?? "";
       }
 
