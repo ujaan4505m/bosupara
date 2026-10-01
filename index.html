@@ -664,12 +664,6 @@
 
     function clearDateFilter() {
       const input = $("dateFilter");
-      if (input) input.value = "";
-      applyFilters();
-    }
-
-    function clearDateFilter() {
-      const input = $("dateFilter");
       if (input) {
         input.value = "";
         applyFilters();
@@ -680,17 +674,16 @@
       if (!value) return "";
       const raw = String(value).trim();
 
-      // Stored Firebase dates are normally YYYY-MM-DD.
-      let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (match) return match[3] + match[2] + match[1];
+      // Stored ISO date: YYYY-MM-DD → DD/MM/YYYY
+      const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
 
-      // Also handle older/imported dates stored as MMDDYYYY or MM/DD/YYYY.
-      match = raw.match(/^(\d{2})[\/-]?(\d{2})[\/-]?(\d{4})$/);
-      if (match) return match[2] + match[1] + match[3];
+      // Legacy/display date: MMDDYYYY → DD/MM/YYYY
+      const compact = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
+      if (compact) return compact[2] + "/" + compact[1] + "/" + compact[3];
 
       return raw;
     }
-
     function applyFilters() {
       const fn = $("fnInitial").value.trim().toLowerCase();
       const sn = $("snInitial").value.trim().toLowerCase();
