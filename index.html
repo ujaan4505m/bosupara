@@ -239,7 +239,7 @@
       <p style="margin-bottom:14px;color:#6c757d;">
         Sign in to access the shared committee database. Your Google account name will be recorded with changes.
       </p>
-      <button class="btn" type="button" id="googleSignInBtn" onclick="signIn()">Continue with Google</button>
+      <button class="btn" type="button" id="googleSignInBtn">Continue with Google</button>
       <p id="loginError" class="error-text"></p>
     </div>
   </div>
@@ -645,51 +645,6 @@
       };
     }
 
-    function clearDateFilter() {
-      const input = $("dateFilter");
-      if (input) {
-        input.value = "";
-        applyFilters();
-      }
-    }
-
-    function formatEditDate(value) {
-      if (!value) return "";
-      const raw = String(value).trim();
-      const iso = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
-      if (iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
-      const compact = raw.match(/^(\\d{2})(\\d{2})(\\d{4})$/);
-      if (compact) return compact[2] + "/" + compact[1] + "/" + compact[3];
-      const slash = raw.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
-      if (slash) return String(slash[1]).padStart(2,"0") + "/" + String(slash[2]).padStart(2,"0") + "/" + slash[3];
-      return raw;
-    }
-
-    function parseEditDate(value) {
-      const raw = String(value || "").trim();
-      if (!raw) return "";
-      const match = raw.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
-      if (!match) return raw;
-      const day = String(match[1]).padStart(2,"0");
-      const month = String(match[2]).padStart(2,"0");
-      const year = match[3];
-      return year + "-" + month + "-" + day;
-    }
-
-    function formatDisplayDate(value) {
-      if (!value) return "";
-      const raw = String(value).trim();
-
-      // Stored ISO date: YYYY-MM-DD → DD/MM/YYYY
-      const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
-
-      // Legacy/display date: MMDDYYYY → DD/MM/YYYY
-      const compact = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
-      if (compact) return compact[2] + "/" + compact[1] + "/" + compact[3];
-
-      return raw;
-    }
     function applyFilters() {
       const fn = $("fnInitial").value.trim().toLowerCase();
       const sn = $("snInitial").value.trim().toLowerCase();
@@ -793,7 +748,7 @@
       $("editPaid2025").textContent = `₹${Number(item.paid_2025 || 0)}`;
       $("editBillNoYear").value = yd.bill_no ?? "";
       $("editPaidYear").value = yd.paid || "";
-      $("editDatePaid").value = formatEditDate(yd.date_paid || "");
+      $("editDatePaid").value = yd.date_paid || "";
       $("editRemarks").value = yd.remarks || "";
 
       const readOnlyYear = currentYear === 2025;
@@ -818,7 +773,7 @@
         changeBox.style.display = "block";
         changeBox.innerHTML =
           `Last change recorded in ${currentYear} by <b>${esc(yd.lastChangedBy)}</b>` +
-          `<div id="lastChangeDetails" style="display:block;margin-top:4px;">${esc(yd.lastChangeDetails || "Loading change details…")}</div>` +
+          (yd.lastChangeDetails ? `<br><span style="display:inline-block;margin-top:4px;">${esc(yd.lastChangeDetails)}</span>` : "") +
           `<div id="lastChangeWhen" class="history-when">Loading date & time…</div>`;
       } else {
         changeBox.style.display = "none";
@@ -973,7 +928,7 @@
           bill_no: $("editBillNoYear").value.trim(),
           paid: Number($("editPaidYear").value) || 0,
           is_due: currentIsDue,
-          date_paid: parseEditDate($("editDatePaid").value || ""),
+          date_paid: $("editDatePaid").value || "",
           remarks: $("editRemarks").value || "",
           lastChangedBy: changedBy
         };
@@ -1049,20 +1004,13 @@
 
     async function loadLastChangeTimestamp(memberId, year) {
       const target = $("lastChangeWhen");
-      const detailTarget = $("lastChangeDetails");
       if (!target) return;
       try {
         const history = await getMemberAuditHistory(memberId, year);
         const latest = history[0];
         target.textContent = latest?.changedAt ? formatAuditTimestamp(latest.changedAt) : "";
-        if (detailTarget && latest) {
-          detailTarget.textContent =
-            latest.details ||
-            (latest.action === "created" ? "Member added" : "Record updated");
-        }
       } catch (err) {
-        console.warn("Could not load last change details:", err);
-        if (detailTarget) detailTarget.textContent = "Change details unavailable";
+        console.warn("Could not load last change time:", err);
         target.textContent = "";
       }
     }
@@ -1265,7 +1213,7 @@
         row[`${year} Bill No`] = yd.bill_no ?? "";
         row[`${year} Paid`] = Number(yd.paid || 0);
         row[`${year} Due`] = yd.is_due ? "DUE" : "";
-        row[`${year} Payment Date`] = formatDisplayDate(yd.date_paid ?? "");
+        row[`${year} Payment Date`] = yd.date_paid ?? "";
         row[`${year} Remarks`] = yd.remarks ?? "";
       }
 
@@ -1420,7 +1368,7 @@
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory,
       updateDueStatusOnInput, clearPaidMark, saveMember, applyFilters, exportAllExcel,
-      exportVisibleExcel, clearDateFilter
+      exportVisibleExcel
     });
   </script>
 
