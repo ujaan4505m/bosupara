@@ -368,7 +368,7 @@
 
         <div class="form-group" style="margin-bottom:12px;">
           <label>Payment Date</label>
-          <input type="text" id="editDatePaid" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY">
+          <input type="date" id="editDatePaid">
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -622,6 +622,30 @@
         : `${currentYear} collection data is shared live with every signed-in device.`;
     }
 
+    function formatDisplayDate(value) {
+      if (!value) return "";
+      const raw = String(value).trim();
+      const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
+      const compact = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
+      if (compact) return compact[2] + "/" + compact[1] + "/" + compact[3];
+      return raw;
+    }
+
+    function normalizePaymentDate(value) {
+      if (!value) return "";
+      const raw = String(value).trim();
+      const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+      const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (slash) {
+        return slash[3] + "-" + String(slash[2]).padStart(2,"0") + "-" + String(slash[1]).padStart(2,"0");
+      }
+      const compact = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
+      if (compact) return compact[3] + "-" + compact[1] + "-" + compact[2];
+      return raw;
+    }
+
     function getYearData(item, year=currentYear) {
       if (year === 2025) {
         return {
@@ -650,7 +674,7 @@
       const sn = $("snInitial").value.trim().toLowerCase();
       const queryText = $("generalSearch").value.trim().toLowerCase();
       const phoneQuery = $("phoneSearch").value.trim().toLowerCase();
-      const dateFilter = $("dateFilter").value;
+      const dateFilter = normalizePaymentDate($("dateFilter").value);
       const statusFilter = $("statusFilter").value;
 
       const filtered = chandaData.filter(item => {
@@ -678,7 +702,7 @@
           if (!phone || !phone.includes(searchPhone)) return false;
         }
 
-        if (dateFilter && yd.date_paid !== dateFilter) return false;
+        if (dateFilter && normalizePaymentDate(yd.date_paid) !== dateFilter) return false;
         const status = yd.is_due ? "due" : (Number(yd.paid || 0) > 0 ? "paid" : "pending");
         if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
@@ -928,7 +952,7 @@
           bill_no: $("editBillNoYear").value.trim(),
           paid: Number($("editPaidYear").value) || 0,
           is_due: currentIsDue,
-          date_paid: $("editDatePaid").value || "",
+          date_paid: normalizePaymentDate($("editDatePaid").value || ""),
           remarks: $("editRemarks").value || "",
           lastChangedBy: changedBy
         };
