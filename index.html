@@ -293,7 +293,6 @@
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="date" id="dateFilter" onchange="applyFilters()" style="flex:1;">
           <button type="button" class="btn btn-outline small-btn" onclick="clearDateFilter()" title="Clear date filter">✕ Clear</button>
-          <button type="button" class="btn btn-outline small-btn" onclick="clearDateFilter()" title="Clear date filter">✕ Clear</button>
         </div>
       </div>
       <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="pending">Pending</option></select></div>
@@ -369,7 +368,7 @@
 
         <div class="form-group" style="margin-bottom:12px;">
           <label>Payment Date</label>
-          <input type="date" id="editDatePaid">
+          <input type="text" id="editDatePaid" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY">
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -670,6 +669,29 @@
       }
     }
 
+    function formatEditDate(value) {
+      if (!value) return "";
+      const raw = String(value).trim();
+      const iso = raw.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+      if (iso) return iso[3] + "/" + iso[2] + "/" + iso[1];
+      const compact = raw.match(/^(\\d{2})(\\d{2})(\\d{4})$/);
+      if (compact) return compact[2] + "/" + compact[1] + "/" + compact[3];
+      const slash = raw.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
+      if (slash) return String(slash[1]).padStart(2,"0") + "/" + String(slash[2]).padStart(2,"0") + "/" + slash[3];
+      return raw;
+    }
+
+    function parseEditDate(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      const match = raw.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
+      if (!match) return raw;
+      const day = String(match[1]).padStart(2,"0");
+      const month = String(match[2]).padStart(2,"0");
+      const year = match[3];
+      return year + "-" + month + "-" + day;
+    }
+
     function formatDisplayDate(value) {
       if (!value) return "";
       const raw = String(value).trim();
@@ -787,7 +809,7 @@
       $("editPaid2025").textContent = `₹${Number(item.paid_2025 || 0)}`;
       $("editBillNoYear").value = yd.bill_no ?? "";
       $("editPaidYear").value = yd.paid || "";
-      $("editDatePaid").value = yd.date_paid || "";
+      $("editDatePaid").value = formatEditDate(yd.date_paid || "");
       $("editRemarks").value = yd.remarks || "";
 
       const readOnlyYear = currentYear === 2025;
@@ -967,7 +989,7 @@
           bill_no: $("editBillNoYear").value.trim(),
           paid: Number($("editPaidYear").value) || 0,
           is_due: currentIsDue,
-          date_paid: $("editDatePaid").value || "",
+          date_paid: parseEditDate($("editDatePaid").value || ""),
           remarks: $("editRemarks").value || "",
           lastChangedBy: changedBy
         };
@@ -1414,7 +1436,7 @@
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory,
       updateDueStatusOnInput, clearPaidMark, saveMember, applyFilters, exportAllExcel,
-      exportVisibleExcel
+      exportVisibleExcel, clearDateFilter
     });
   </script>
 
