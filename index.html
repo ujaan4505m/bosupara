@@ -678,11 +678,17 @@
 
     function formatDisplayDate(value) {
       if (!value) return "";
-      const parts = String(value).split("-");
-      if (parts.length === 3 && /^\d{4}$/.test(parts[0])) {
-        return parts[2] + parts[1] + parts[0];
-      }
-      return String(value);
+      const raw = String(value).trim();
+
+      // Stored Firebase dates are normally YYYY-MM-DD.
+      let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match) return match[3] + match[2] + match[1];
+
+      // Also handle older/imported dates stored as MMDDYYYY or MM/DD/YYYY.
+      match = raw.match(/^(\d{2})[\/-]?(\d{2})[\/-]?(\d{4})$/);
+      if (match) return match[2] + match[1] + match[3];
+
+      return raw;
     }
 
     function applyFilters() {
