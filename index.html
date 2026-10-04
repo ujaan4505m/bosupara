@@ -331,7 +331,7 @@
         <input type="hidden" id="editId">
 
         <div class="form-group" style="margin-bottom:12px;">
-          <label>Original / 2025 Bill No.</label>
+          <label id="referenceBillLabel">2025 Bill No. (Read-Only)</label>
           <input type="text" id="editBillNo" readonly>
         </div>
 
@@ -351,7 +351,7 @@
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
-          <label>2025 PAID (Strictly Read-Only)</label>
+          <label id="referencePaidLabel">2025 PAID (Strictly Read-Only)</label>
           <div class="readonly-box" id="editPaid2025">₹0</div>
         </div>
 
@@ -749,9 +749,9 @@
           <div class="member-item" onclick="openEditModal('${esc(item.id)}')">
             <div class="member-info">
               <h3>${esc(item.name || "Unnamed")}</h3>
-              <p><b>2025 Bill #${esc(item.bill_no)}</b> | ${esc(item.street)}</p>
+              <p><b>${currentYear === 2025 ? "2025" : currentYear - 1} Bill #${esc(getYearData(item, currentYear === 2025 ? 2025 : currentYear - 1).bill_no)}</b> | ${esc(item.street)}</p>
               <p style="margin-top:2px;color:#495057;">
-                2025 Paid: <b>₹${Number(item.paid_2025 || 0)}</b>
+                ${currentYear === 2025 ? "2025" : currentYear - 1} Paid: <b>₹${Number(getYearData(item, currentYear === 2025 ? 2025 : currentYear - 1).paid || 0)}</b>
                 ${yd.bill_no ? ` | ${currentYear} Bill: <b>#${esc(yd.bill_no)}</b>` : ""}
                 ${currentYear !== 2025 ? ` | ${currentYear} Paid: <b>₹${yd.paid}</b>` : ""}
               </p>
@@ -767,12 +767,17 @@
       if (!item) return;
 
       const yd = getYearData(item);
+      const referenceYear = currentYear === 2025 ? 2025 : currentYear - 1;
+      const referenceData = getYearData(item, referenceYear);
+
       $("editId").value = item.id;
-      $("editBillNo").value = item.bill_no ?? "";
+      $("editBillNo").value = referenceData.bill_no ?? "";
       $("editName").value = item.name ?? "";
       $("editStreet").value = item.street ?? "";
       $("editPhone").value = item.phone ?? "";
-      $("editPaid2025").textContent = `₹${Number(item.paid_2025 || 0)}`;
+      $("editPaid2025").textContent = `₹${Number(referenceData.paid || 0)}`;
+      $("referenceBillLabel").textContent = `${referenceYear} Bill No. (Read-Only)`;
+      $("referencePaidLabel").textContent = `${referenceYear} PAID (Strictly Read-Only)`;
       $("editBillNoYear").value = yd.bill_no ?? "";
       $("editPaidYear").value = yd.paid || "";
       $("editDatePaid").value = yd.date_paid || "";
@@ -825,6 +830,8 @@
       $("editStreet").value = "";
       $("editPhone").value = "";
       $("editPaid2025").textContent = "₹0";
+      $("referenceBillLabel").textContent = `${currentYear === 2025 ? 2025 : currentYear - 1} Bill No. (Read-Only)`;
+      $("referencePaidLabel").textContent = `${currentYear === 2025 ? 2025 : currentYear - 1} PAID (Strictly Read-Only)`;
       $("editBillNoYear").value = "";
       $("editPaidYear").value = "";
       $("editDatePaid").value = "";
