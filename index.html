@@ -716,9 +716,39 @@
     }
 
     function renderDashboard() {
-      let paid=0,due=0,pending=0,total=0;
-      chandaData.forEach(item=>{const yd=getYearData(item); const amount=Number(yd.paid||0); if(yd.is_due){due++;} else if(amount>0){paid++; total+=amount;} else {pending++;}});
-      $("dashboardStats").innerHTML=`<div class="dashboard-stat"><b>${chandaData.length}</b><small>Total Members</small></div><div class="dashboard-stat"><b>${paid}</b><small>Paid</small></div><div class="dashboard-stat"><b>${due}</b><small>Due</small></div><div class="dashboard-stat"><b>${pending}</b><small>Pending</small></div><div class="dashboard-stat wide"><b>₹${total.toLocaleString("en-IN")}</b><small>Total Collected in ${currentYear}</small></div>`;
+      let paidCount=0, dueCount=0, pending=0, blankDue=0;
+      let paidTotal=0, dueTotal=0;
+
+      chandaData.forEach(item => {
+        const yd = getYearData(item);
+        const amount = Number(yd.paid || 0);
+
+        if (yd.is_due) {
+          dueCount++;
+          if (amount > 0) {
+            dueTotal += amount;
+          } else {
+            blankDue++;
+          }
+        } else if (amount > 0) {
+          paidCount++;
+          paidTotal += amount;
+        } else {
+          pending++;
+        }
+      });
+
+      const finalTotal = paidTotal + dueTotal;
+
+      $("dashboardStats").innerHTML =
+        `<div class="dashboard-stat"><b>${chandaData.length}</b><small>Total Members</small></div>` +
+        `<div class="dashboard-stat"><b>${paidCount}</b><small>Paid</small></div>` +
+        `<div class="dashboard-stat"><b>${dueCount}</b><small>Due</small></div>` +
+        `<div class="dashboard-stat"><b>${pending}</b><small>Pending</small></div>` +
+        `<div class="dashboard-stat"><b>₹${paidTotal.toLocaleString("en-IN")}</b><small>Amount Paid</small></div>` +
+        `<div class="dashboard-stat"><b>₹${dueTotal.toLocaleString("en-IN")}</b><small>Due Amount</small></div>` +
+        `<div class="dashboard-stat"><b>${blankDue}</b><small>Due — No Amount</small></div>` +
+        `<div class="dashboard-stat wide"><b>₹${finalTotal.toLocaleString("en-IN")}</b><small>Total Paid + Due Amount in ${currentYear}</small></div>`;
     }
 
     function renderList(list) {
