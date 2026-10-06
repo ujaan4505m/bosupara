@@ -301,6 +301,7 @@
     <div class="stats-bar">
       <span id="resultsCount">Showing 0 members</span>
       <div class="stats-actions">
+        <button class="btn btn-outline small-btn" id="billSortBtn" onclick="toggleBillNoSort()">Bill No. 1 →</button>
         <button class="btn btn-outline small-btn" onclick="openAddModal()">+ Add New Member</button>
         <button class="btn btn-outline small-btn" onclick="exportVisibleExcel()">⬇ Current View</button>
       </div>
@@ -498,6 +499,7 @@
     let configuredYears = [];
     let accessDeniedMessagePending = false;
     let currentIsDue = false;
+    let billNoAscending = false;
     let unsubscribeMembers = null;
     let isSeeding = false;
 
@@ -712,8 +714,36 @@
         return true;
       });
 
+      if (billNoAscending) {
+        filtered.sort((a, b) => {
+          const aBill = String(getYearData(a).bill_no ?? "").trim();
+          const bBill = String(getYearData(b).bill_no ?? "").trim();
+          const aNum = Number(aBill);
+          const bNum = Number(bBill);
+          const aIsNum = aBill !== "" && Number.isFinite(aNum);
+          const bIsNum = bBill !== "" && Number.isFinite(bNum);
+
+          if (aIsNum && bIsNum) return aNum - bNum;
+          if (aIsNum) return -1;
+          if (bIsNum) return 1;
+          if (!aBill && !bBill) return 0;
+          if (!aBill) return 1;
+          if (!bBill) return -1;
+          return aBill.localeCompare(bBill, undefined, { numeric: true, sensitivity: "base" });
+        });
+      }
+
       renderDashboard();
       renderList(filtered);
+    }
+
+    function toggleBillNoSort() {
+      billNoAscending = !billNoAscending;
+      const btn = $("billSortBtn");
+      if (btn) {
+        btn.textContent = billNoAscending ? "Bill No. 1 →" : "Bill No. Default";
+      }
+      applyFilters();
     }
 
     function renderDashboard() {
@@ -1437,7 +1467,7 @@
       signIn, signOutUser, changeYear, addUpcomingYear, confirmAddYear,
       closeYearModal, openEditModal, openAddModal, closeModal, toggleDueState,
       openRevenueReport, closeRevenueReport, generateRevenueReport,
-      openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory,
+      openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory, toggleBillNoSort,
       updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel,
       exportVisibleExcel
     });
