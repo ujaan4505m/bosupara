@@ -786,12 +786,13 @@
     }
 
     function renderDashboard() {
-      let paidCount=0, dueCount=0, pending=0, blankDue=0;
+      let paidCount=0, dueCount=0, pending=0, blankDue=0, donatedCount=0;
       let paidTotal=0, dueTotal=0;
 
       chandaData.forEach(item => {
         const yd = getYearData(item);
         const amount = Number(yd.paid || 0);
+        if (String(yd.donation || "").trim()) donatedCount++;
 
         if (yd.is_due) {
           dueCount++;
@@ -818,6 +819,7 @@
         `<div class="dashboard-stat"><b>₹${paidTotal.toLocaleString("en-IN")}</b><small>Amount Paid</small></div>` +
         `<div class="dashboard-stat"><b>₹${dueTotal.toLocaleString("en-IN")}</b><small>Due Amount</small></div>` +
         `<div class="dashboard-stat"><b>${blankDue}</b><small>Due — No Amount</small></div>` +
+        `<div class="dashboard-stat" onclick="openDonationList()" style="cursor:pointer;"><b>${donatedCount}</b><small>Donated 🎁</small></div>` +
         `<div class="dashboard-stat wide"><b>₹${finalTotal.toLocaleString("en-IN")}</b><small>Total Paid + Due Amount in ${currentYear}</small></div>`;
     }
 
