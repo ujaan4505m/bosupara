@@ -674,6 +674,7 @@
         is_due: Boolean(item.years?.[String(year)]?.is_due),
         date_paid: item.years?.[String(year)]?.date_paid ?? "",
         remarks: item.years?.[String(year)]?.remarks ?? "",
+        donation: item.years?.[String(year)]?.donation ?? "",
         lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? "",
         lastChangeDetails: item.years?.[String(year)]?.lastChangeDetails ?? ""
       };
@@ -848,6 +849,7 @@
       $("editPaidYear").value = yd.paid || "";
       $("editDatePaid").value = yd.date_paid || "";
       $("editRemarks").value = yd.remarks || "";
+      $("editDonation").value = yd.donation || "";
 
       const readOnlyYear = currentYear === 2025;
       $("editName").readOnly = readOnlyYear;
@@ -858,6 +860,7 @@
       $("editDatePaid").readOnly = readOnlyYear;
       $("clearDateBtn").disabled = readOnlyYear;
       $("editRemarks").readOnly = readOnlyYear;
+      $("editDonation").readOnly = readOnlyYear;
       $("dueToggleBtn").disabled = readOnlyYear;
       $("saveBtn").style.display = "inline-flex";
 
@@ -902,6 +905,7 @@
       $("editPaidYear").value = "";
       $("editDatePaid").value = "";
       $("editRemarks").value = "";
+      $("editDonation").value = "";
       $("editName").readOnly = false;
       $("editStreet").readOnly = false;
       $("editPhone").readOnly = false;
@@ -967,6 +971,7 @@
         if (yearData.is_due) changes.push("Status: DUE");
         addValue("Payment Date", yearData.date_paid);
         addValue("Phone", newPhone);
+        addValue("Donation", yearData.donation);
         addValue("Remarks", yearData.remarks);
         return changes.length ? "Added " + changes.join(" • ") : "Added member";
       }
@@ -985,6 +990,9 @@
       }
       if ((oldYear?.remarks ?? "") !== yearData.remarks) {
         changes.push(yearData.remarks ? "Remarks changed to " + yearData.remarks : "Remarks cleared");
+      }
+      if ((oldYear?.donation ?? "") !== yearData.donation) {
+        changes.push(yearData.donation ? "Donation changed to " + yearData.donation : "Donation cleared");
       }
       if ((item?.name ?? "") !== $("editName").value.trim()) {
         changes.push("Name changed to " + $("editName").value.trim());
@@ -1016,6 +1024,18 @@
       }
 
       try {
+        const billNo = $("editBillNoYear").value.trim();
+        if (billNo) {
+          const duplicate = chandaData.find(item => {
+            if (id && String(item.id) === String(id)) return false;
+            return String(getYearData(item, currentYear).bill_no ?? "").trim().toLowerCase() === billNo.toLowerCase();
+          });
+          if (duplicate) {
+            alert("Bill No. " + billNo + " already exists in " + currentYear + " with the name \"" + (duplicate.name || "Unnamed") + "\". Please use a different bill number.");
+            return;
+          }
+        }
+
         if (currentYear === 2025) {
           // Keep historical 2025 collection values read-only. Phone is shared
           // contact information, so it may still be added/edited here.
@@ -1036,6 +1056,7 @@
           is_due: currentIsDue,
           date_paid: normalizePaymentDate($("editDatePaid").value || ""),
           remarks: $("editRemarks").value || "",
+          donation: $("editDonation").value.trim(),
           lastChangedBy: changedBy
         };
 
