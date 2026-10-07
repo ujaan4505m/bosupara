@@ -1402,6 +1402,7 @@
         row[`${year} Due`] = yd.is_due ? "DUE" : "";
         row[`${year} Payment Date`] = yd.date_paid ?? "";
         row[`${year} Remarks`] = yd.remarks ?? "";
+        row[`${year} Donation`] = yd.donation ?? "";
       }
 
       row["Last Changed By"] = item.lastChangedBy ?? "";
