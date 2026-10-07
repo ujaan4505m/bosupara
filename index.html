@@ -295,7 +295,7 @@
           
         </div>
       </div>
-      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="due-no-amount">Due - No Amount</option><option value="pending">Pending</option></select></div>
+      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="due-no-amount">Due - No Amount</option><option value="pending">Pending</option><option value="donated">Donated 🎁</option></select></div>
     </div>
 
     <div class="stats-bar">
@@ -304,7 +304,6 @@
         <button class="btn btn-outline small-btn" id="billSortBtn" onclick="toggleBillNoSort()">Bill No. 1 →</button>
         <button class="btn btn-outline small-btn" id="nameSortBtn" onclick="toggleNameSort()">Name A → Z</button>
         <button class="btn btn-outline small-btn" onclick="openAddModal()">+ Add New Member</button>
-        <button class="btn btn-outline small-btn" onclick="openDonationList()">🎁 Donation</button>
         <button class="btn btn-outline small-btn" onclick="exportVisibleExcel()">⬇ Current View</button>
       </div>
     </div>
@@ -411,17 +410,6 @@
       </div>
       <p id="historyMemberName" class="small-muted"></p>
       <div id="historyResults" class="history-list"></div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="donationModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>🎁 Donations • <span id="donationYearTitle"></span></h2>
-        <button class="close-btn" onclick="closeDonationList()">&times;</button>
-      </div>
-      <p id="donationCountText" class="small-muted"></p>
-      <div id="donationResults" class="history-list"></div>
     </div>
   </div>
 
@@ -729,8 +717,13 @@
 
         if (dateFilter && normalizePaymentDate(yd.date_paid) !== dateFilter) return false;
         const amount = Number(yd.paid || 0);
-        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (amount > 0 ? "paid" : "pending");
-        if (statusFilter !== "all" && status !== statusFilter) return false;
+        const hasDonation = String(yd.donation || "").trim() !== "";
+        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending"));
+        if (statusFilter === "donated") {
+          if (!hasDonation) return false;
+        } else if (statusFilter !== "all" && status !== statusFilter) {
+          return false;
+        }
         return true;
       });
 
@@ -792,7 +785,8 @@
       chandaData.forEach(item => {
         const yd = getYearData(item);
         const amount = Number(yd.paid || 0);
-        if (String(yd.donation || "").trim()) donatedCount++;
+        const hasDonation = String(yd.donation || "").trim() !== "";
+        if (hasDonation) donatedCount++;
 
         if (yd.is_due) {
           dueCount++;
@@ -804,7 +798,7 @@
         } else if (amount > 0) {
           paidCount++;
           paidTotal += amount;
-        } else {
+        } else if (!hasDonation) {
           pending++;
         }
       });
@@ -819,7 +813,7 @@
         `<div class="dashboard-stat"><b>₹${paidTotal.toLocaleString("en-IN")}</b><small>Amount Paid</small></div>` +
         `<div class="dashboard-stat"><b>₹${dueTotal.toLocaleString("en-IN")}</b><small>Due Amount</small></div>` +
         `<div class="dashboard-stat"><b>${blankDue}</b><small>Due — No Amount</small></div>` +
-        `<div class="dashboard-stat" onclick="openDonationList()" style="cursor:pointer;"><b>${donatedCount}</b><small>Donated 🎁</small></div>` +
+        `<div class="dashboard-stat" onclick="showDonatedFilter()" style="cursor:pointer;"><b>${donatedCount}</b><small>Donated 🎁</small></div>` +
         `<div class="dashboard-stat wide"><b>₹${finalTotal.toLocaleString("en-IN")}</b><small>Total Paid + Due Amount in ${currentYear}</small></div>`;
     }
 
@@ -835,13 +829,18 @@
 
       $("memberList").innerHTML = list.map(item => {
         const yd = getYearData(item);
+        const hasDonation = String(yd.donation || "").trim() !== "";
         let badge = '<span class="badge badge-pending">Pending</span>';
         if (currentYear === 2025) {
           badge = `<span class="badge badge-paid">₹${yd.paid}</span>`;
         } else if (yd.is_due) {
           badge = '<span class="badge badge-due">DUE</span>';
+        } else if (yd.paid > 0 && hasDonation) {
+          badge = `<span class="badge badge-paid">PAID: ₹${yd.paid} • Donated</span>`;
         } else if (yd.paid > 0) {
           badge = `<span class="badge badge-paid">PAID: ₹${yd.paid}</span>`;
+        } else if (hasDonation) {
+          badge = '<span class="badge badge-paid">Donated</span>';
         }
 
         const change = yd.lastChangedBy && yd.lastChangedBy !== "Initial imported data"
@@ -1359,29 +1358,10 @@
       closeYearModal();
     }
 
-    function openDonationList() {
-      $("donationYearTitle").textContent = String(currentYear);
-      const donated = chandaData.map(item => ({item, yd: getYearData(item)}))
-        .filter(x => String(x.yd.donation || "").trim());
-
-      $("donationCountText").textContent =
-        donated.length + (donated.length === 1 ? " person has" : " people have") +
-        " donated in " + currentYear + ".";
-
-      $("donationResults").innerHTML = donated.length
-        ? donated.map(x => `
-            <div class="history-entry">
-              <div class="history-who"><b>${esc(x.item.name || "Unnamed")}</b></div>
-              <div class="history-details"><b>Donated:</b> ${esc(x.yd.donation)}</div>
-              <div class="history-details">Bill No.: ${esc(x.yd.bill_no || "—")} • Street: ${esc(x.item.street || "—")}</div>
-            </div>`).join("")
-        : '<div class="history-empty">No donations recorded for this year yet.</div>';
-
-      $("donationModal").style.display = "flex";
-    }
-
-    function closeDonationList() {
-      $("donationModal").style.display = "none";
+    function showDonatedFilter() {
+      $("statusFilter").value = "donated";
+      applyFilters();
+      $("statusFilter").scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     function flattenForExcel(item) {
@@ -1555,7 +1535,7 @@
       closeYearModal, openEditModal, openAddModal, closeModal, toggleDueState,
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory, toggleBillNoSort,
-      updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel,
+      updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel, showDonatedFilter,
       exportVisibleExcel
     });
   </script>
