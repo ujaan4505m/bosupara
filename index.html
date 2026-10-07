@@ -302,7 +302,9 @@
       <span id="resultsCount">Showing 0 members</span>
       <div class="stats-actions">
         <button class="btn btn-outline small-btn" id="billSortBtn" onclick="toggleBillNoSort()">Bill No. 1 →</button>
+        <button class="btn btn-outline small-btn" id="nameSortBtn" onclick="toggleNameSort()">Name A → Z</button>
         <button class="btn btn-outline small-btn" onclick="openAddModal()">+ Add New Member</button>
+        <button class="btn btn-outline small-btn" onclick="openDonationList()">🎁 Donation</button>
         <button class="btn btn-outline small-btn" onclick="exportVisibleExcel()">⬇ Current View</button>
       </div>
     </div>
@@ -412,6 +414,17 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="donationModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🎁 Donations • <span id="donationYearTitle"></span></h2>
+        <button class="close-btn" onclick="closeDonationList()">&times;</button>
+      </div>
+      <p id="donationCountText" class="small-muted"></p>
+      <div id="donationResults" class="history-list"></div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="revenueModal">
     <div class="modal-content">
       <div class="modal-header">
@@ -505,6 +518,7 @@
     let accessDeniedMessagePending = false;
     let currentIsDue = false;
     let billNoAscending = false;
+    let nameAscending = false;
     let unsubscribeMembers = null;
     let isSeeding = false;
 
@@ -720,7 +734,9 @@
         return true;
       });
 
-      if (billNoAscending) {
+      if (nameAscending) {
+        filtered.sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? ""), undefined, { sensitivity: "base" }));
+      } else if (billNoAscending) {
         filtered.sort((a, b) => {
           const aBill = String(getYearData(a).bill_no ?? "").trim();
           const bBill = String(getYearData(b).bill_no ?? "").trim();
@@ -745,9 +761,26 @@
 
     function toggleBillNoSort() {
       billNoAscending = !billNoAscending;
+      nameAscending = false;
       const btn = $("billSortBtn");
-      if (btn) {
-        btn.textContent = billNoAscending ? "Bill No. 1 →" : "Bill No. Default";
+      const nameBtn = $("nameSortBtn");
+      if (btn) btn.textContent = billNoAscending ? "Bill No. 1 →" : "Bill No. Default";
+      if (nameBtn) nameBtn.textContent = "Name A → Z";
+      applyFilters();
+    }
+
+    function toggleNameSort() {
+      nameAscending = !nameAscending;
+      const btn = $("nameSortBtn");
+      if (btn) btn.textContent = nameAscending ? "Name A → Z ✓" : "Name A → Z";
+      if (nameAscending) {
+        billNoAscending = false;
+        const billBtn = $("billSortBtn");
+        if (billBtn) billBtn.textContent = "Bill No. Default";
+      } else {
+        billNoAscending = true;
+        const billBtn = $("billSortBtn");
+        if (billBtn) billBtn.textContent = "Bill No. 1 →";
       }
       applyFilters();
     }
@@ -1322,6 +1355,31 @@
       $("yearSelect").value = String(year);
       changeYear();
       closeYearModal();
+    }
+
+    function openDonationList() {
+      $("donationYearTitle").textContent = String(currentYear);
+      const donated = chandaData.map(item => ({item, yd: getYearData(item)}))
+        .filter(x => String(x.yd.donation || "").trim());
+
+      $("donationCountText").textContent =
+        donated.length + (donated.length === 1 ? " person has" : " people have") +
+        " donated in " + currentYear + ".";
+
+      $("donationResults").innerHTML = donated.length
+        ? donated.map(x => `
+            <div class="history-entry">
+              <div class="history-who"><b>${esc(x.item.name || "Unnamed")}</b></div>
+              <div class="history-details"><b>Donated:</b> ${esc(x.yd.donation)}</div>
+              <div class="history-details">Bill No.: ${esc(x.yd.bill_no || "—")} • Street: ${esc(x.item.street || "—")}</div>
+            </div>`).join("")
+        : '<div class="history-empty">No donations recorded for this year yet.</div>';
+
+      $("donationModal").style.display = "flex";
+    }
+
+    function closeDonationList() {
+      $("donationModal").style.display = "none";
     }
 
     function flattenForExcel(item) {
