@@ -730,7 +730,7 @@
         const hasBalance = targetAmount > amount;
         const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (hasBalance ? "part-paid" : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending")));
         if (statusFilter === "donated") { if (!hasDonation) return false; }
-        else if (statusFilter === "part-paid") { if (!hasBalance || amount <= 0) return false; }
+        else if (statusFilter === "part-paid") { if (!hasBalance) return false; }
         else if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       });
@@ -853,6 +853,8 @@
           badge = '<span class="badge badge-due">DUE</span>';
         } else if (balance > 0 && yd.paid > 0) {
           badge = `<span class="badge badge-due">PART PAID: ₹${yd.paid} • Left ₹${balance}${hasDonation ? " • Donated" : ""}</span>`;
+        } else if (balance > 0) {
+          badge = `<span class="badge badge-pending">NOT PAID • Left ₹${balance}${hasDonation ? " • Donated" : ""}</span>`;
         } else if (yd.paid > 0 && hasDonation) {
           badge = `<span class="badge badge-paid">PAID: ₹${yd.paid} • Donated</span>`;
         } else if (yd.paid > 0) {
