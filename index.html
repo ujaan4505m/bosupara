@@ -295,7 +295,7 @@
           
         </div>
       </div>
-      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="due-no-amount">Due - No Amount</option><option value="pending">Pending</option><option value="donated">Donated 🎁</option></select></div>
+      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="due-no-amount">Due - No Amount</option><option value="pending">Pending</option><option value="part-paid">Part Paid / Balance Remaining</option><option value="donated">Donated 🎁</option></select></div>
     </div>
 
     <div class="stats-bar">
@@ -363,8 +363,14 @@
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
-          <label id="yearPaidLabel">2026 PAID (₹)</label>
-          <input type="number" id="editPaidYear" min="0" step="1" placeholder="Enter amount paid" oninput="updateDueStatusOnInput()">
+          <label id="yearPaidLabel">2026 Total Amount Expected (₹)</label>
+          <input type="number" id="editPaidYear" min="0" step="1" placeholder="Enter total amount expected" oninput="updateDueStatusOnInput()">
+          <div class="small-muted" style="margin-top:5px;">Total amount the member is expected to pay.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>Amount Paid Now (₹)</label>
+          <input type="number" id="editPaymentNow" min="0" step="1" placeholder="Enter amount received this time">
+          <div class="small-muted" style="margin-top:5px;">For part payments, enter only the amount received today. This adds to previous payments.</div>
           <button type="button" id="clearPaidBtn" class="btn btn-outline small-btn" style="display:none;margin-top:6px;" onclick="clearPaidMark()">Clear Paid Mark</button>
         </div>
 
@@ -677,6 +683,7 @@
         date_paid: item.years?.[String(year)]?.date_paid ?? "",
         remarks: item.years?.[String(year)]?.remarks ?? "",
         donation: item.years?.[String(year)]?.donation ?? "",
+        total_amount: Number(item.years?.[String(year)]?.total_amount ?? item.years?.[String(year)]?.paid ?? 0),
         lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? "",
         lastChangeDetails: item.years?.[String(year)]?.lastChangeDetails ?? ""
       };
@@ -717,13 +724,13 @@
 
         if (dateFilter && normalizePaymentDate(yd.date_paid) !== dateFilter) return false;
         const amount = Number(yd.paid || 0);
+        const targetAmount = Number(yd.total_amount || 0);
         const hasDonation = String(yd.donation || "").trim() !== "";
-        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending"));
-        if (statusFilter === "donated") {
-          if (!hasDonation) return false;
-        } else if (statusFilter !== "all" && status !== statusFilter) {
-          return false;
-        }
+        const hasBalance = targetAmount > amount;
+        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (hasBalance ? "part-paid" : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending")));
+        if (statusFilter === "donated") { if (!hasDonation) return false; }
+        else if (statusFilter === "part-paid") { if (!hasBalance || amount <= 0) return false; }
+        else if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       });
 
@@ -779,14 +786,17 @@
     }
 
     function renderDashboard() {
-      let paidCount=0, dueCount=0, pending=0, blankDue=0, donatedCount=0;
-      let paidTotal=0, dueTotal=0;
+      let paidCount=0, dueCount=0, pending=0, blankDue=0, donatedCount=0, partPaidCount=0;
+      let paidTotal=0, dueTotal=0, remainingTotal=0;
 
       chandaData.forEach(item => {
         const yd = getYearData(item);
         const amount = Number(yd.paid || 0);
+        const targetAmount = Number(yd.total_amount || 0);
+        const balance = Math.max(0, targetAmount - amount);
         const hasDonation = String(yd.donation || "").trim() !== "";
         if (hasDonation) donatedCount++;
+        if (balance > 0 && amount > 0) { partPaidCount++; remainingTotal += balance; }
 
         if (yd.is_due) {
           dueCount++;
@@ -813,6 +823,8 @@
         `<div class="dashboard-stat"><b>₹${paidTotal.toLocaleString("en-IN")}</b><small>Amount Paid</small></div>` +
         `<div class="dashboard-stat"><b>₹${dueTotal.toLocaleString("en-IN")}</b><small>Due Amount</small></div>` +
         `<div class="dashboard-stat"><b>${blankDue}</b><small>Due — No Amount</small></div>` +
+        `<div class="dashboard-stat" onclick="showPartPaidFilter()" style="cursor:pointer;"><b>${partPaidCount}</b><small>Part Paid</small></div>` +
+        `<div class="dashboard-stat"><b>₹${remainingTotal.toLocaleString("en-IN")}</b><small>Remaining Balance</small></div>` +
         `<div class="dashboard-stat" onclick="showDonatedFilter()" style="cursor:pointer;"><b>${donatedCount}</b><small>Donated 🎁</small></div>` +
         `<div class="dashboard-stat wide"><b>₹${finalTotal.toLocaleString("en-IN")}</b><small>Total Paid + Due Amount in ${currentYear}</small></div>`;
     }
@@ -830,11 +842,15 @@
       $("memberList").innerHTML = list.map(item => {
         const yd = getYearData(item);
         const hasDonation = String(yd.donation || "").trim() !== "";
+        const targetAmount = Number(yd.total_amount || 0);
+        const balance = Math.max(0, targetAmount - Number(yd.paid || 0));
         let badge = '<span class="badge badge-pending">Pending</span>';
         if (currentYear === 2025) {
           badge = `<span class="badge badge-paid">₹${yd.paid}</span>`;
         } else if (yd.is_due) {
           badge = '<span class="badge badge-due">DUE</span>';
+        } else if (balance > 0 && yd.paid > 0) {
+          badge = `<span class="badge badge-due">PART PAID: ₹${yd.paid} • Left ₹${balance}${hasDonation ? " • Donated" : ""}</span>`;
         } else if (yd.paid > 0 && hasDonation) {
           badge = `<span class="badge badge-paid">PAID: ₹${yd.paid} • Donated</span>`;
         } else if (yd.paid > 0) {
@@ -854,7 +870,7 @@
               <p style="margin-top:2px;color:#495057;">
                 ${currentYear === 2025 ? "2025" : currentYear - 1} Paid: <b>₹${Number(getYearData(item, currentYear === 2025 ? 2025 : currentYear - 1).paid || 0)}</b>
                 ${yd.bill_no ? ` | ${currentYear} Bill: <b>#${esc(yd.bill_no)}</b>` : ""}
-                ${currentYear !== 2025 ? ` | ${currentYear} Paid: <b>₹${yd.paid}</b>` : ""}
+                ${currentYear !== 2025 ? ` | ${currentYear} Paid: <b>₹${yd.paid}</b>${balance > 0 ? ` | Remaining: <b>₹${balance}</b>` : ""}` : ""}
               </p>
               ${change}
             </div>
@@ -880,7 +896,8 @@
       $("referenceBillLabel").textContent = `${referenceYear} Bill No. (Read-Only)`;
       $("referencePaidLabel").textContent = `${referenceYear} PAID (Strictly Read-Only)`;
       $("editBillNoYear").value = yd.bill_no ?? "";
-      $("editPaidYear").value = yd.paid || "";
+      $("editPaidYear").value = yd.total_amount || yd.paid || "";
+      $("editPaymentNow").value = "";
       $("editDatePaid").value = yd.date_paid || "";
       $("editRemarks").value = yd.remarks || "";
       $("editDonation").value = yd.donation || "";
@@ -891,6 +908,7 @@
       $("editPhone").readOnly = false;
       $("editBillNoYear").readOnly = readOnlyYear;
       $("editPaidYear").readOnly = readOnlyYear;
+      $("editPaymentNow").readOnly = readOnlyYear;
       $("editDatePaid").readOnly = readOnlyYear;
       $("clearDateBtn").disabled = readOnlyYear;
       $("editRemarks").readOnly = readOnlyYear;
@@ -937,6 +955,7 @@
       $("referencePaidLabel").textContent = `${currentYear === 2025 ? 2025 : currentYear - 1} PAID (Strictly Read-Only)`;
       $("editBillNoYear").value = "";
       $("editPaidYear").value = "";
+      $("editPaymentNow").value = "";
       $("editDatePaid").value = "";
       $("editRemarks").value = "";
       $("editDonation").value = "";
@@ -945,6 +964,7 @@
       $("editPhone").readOnly = false;
       $("editBillNoYear").readOnly = false;
       $("editPaidYear").readOnly = false;
+      $("editPaymentNow").readOnly = false;
       $("editDatePaid").readOnly = false;
       $("editRemarks").readOnly = false;
       $("dueToggleBtn").disabled = false;
@@ -1084,9 +1104,18 @@
           return;
         }
 
+        const previousPaid = Number(existingItem ? getYearData(existingItem, currentYear).paid : 0) || 0;
+        const paymentNowRaw = $("editPaymentNow").value.trim();
+        const paymentNow = paymentNowRaw === "" ? 0 : Number(paymentNowRaw);
+        const targetAmount = Number($("editPaidYear").value) || 0;
+        if (!Number.isFinite(paymentNow) || paymentNow < 0) { alert("Enter a valid amount received now."); return; }
+        if (paymentNow > 0 && targetAmount <= 0) { alert("Enter the total amount expected before recording a payment."); return; }
+        if (paymentNow > 0 && previousPaid + paymentNow > targetAmount) { alert("This payment exceeds the remaining balance of ₹" + Math.max(0, targetAmount - previousPaid) + "."); return; }
+        const updatedPaid = paymentNow > 0 ? previousPaid + paymentNow : (targetAmount > 0 && !existingItem ? 0 : previousPaid);
         const yearData = {
           bill_no: $("editBillNoYear").value.trim(),
-          paid: Number($("editPaidYear").value) || 0,
+          paid: updatedPaid,
+          total_amount: targetAmount || previousPaid,
           is_due: currentIsDue,
           date_paid: normalizePaymentDate($("editDatePaid").value || ""),
           remarks: $("editRemarks").value || "",
@@ -1364,6 +1393,12 @@
       $("statusFilter").scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
+    function showPartPaidFilter() {
+      $("statusFilter").value = "part-paid";
+      applyFilters();
+      $("statusFilter").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     function flattenForExcel(item) {
       const row = {
         "Member ID": item.id,
@@ -1379,6 +1414,8 @@
         const yd = item.years[String(year)] || {};
         row[`${year} Bill No`] = yd.bill_no ?? "";
         row[`${year} Paid`] = Number(yd.paid || 0);
+        row[`${year} Total Expected`] = Number(yd.total_amount ?? yd.paid ?? 0);
+        row[`${year} Remaining Balance`] = Math.max(0, Number(yd.total_amount ?? yd.paid ?? 0) - Number(yd.paid || 0));
         row[`${year} Due`] = yd.is_due ? "DUE" : "";
         row[`${year} Payment Date`] = yd.date_paid ?? "";
         row[`${year} Remarks`] = yd.remarks ?? "";
