@@ -734,8 +734,8 @@
         }
 
         if (phoneQuery) {
-          const phone = String(item.phone ?? "").replace(/\\D/g, "").toLowerCase();
-          const searchPhone = phoneQuery.replace(/\\D/g, "");
+          const phone = String(item.phone ?? "").replace(/\D/g, "");
+          const searchPhone = phoneQuery.replace(/\D/g, "");
           if (!phone || !phone.includes(searchPhone)) return false;
         }
 
@@ -824,7 +824,7 @@
             blankDue++;
           }
         } else if (amount > 0) {
-          paidCount++;
+          if (balance <= 0) paidCount++;
           paidTotal += amount;
         } else if (!hasDonation) {
           pending++;
@@ -1138,6 +1138,7 @@
         const oldPaymentHistory = existingItem ? getYearData(existingItem, currentYear).paymentHistory || [] : [];
         const paymentHistory = paymentNow > 0 ? [...oldPaymentHistory, {
           amount: paymentNow,
+          paymentDate: normalizePaymentDate($("editDatePaid").value || new Date().toISOString().slice(0,10)),
           receivedBy: changedBy,
           receivedByEmail: auth.currentUser?.email || "",
           receivedByUid: auth.currentUser?.uid || "",
@@ -1306,11 +1307,27 @@
       let total = 0;
       for (const item of chandaData) {
         for (const [yearKey, yd] of Object.entries(item.years || {})) {
-          const amount = Number(yd?.paid || 0);
-          const date = yd?.date_paid || "";
-          if (yd?.is_due || amount <= 0 || !date || date < from || date > to) continue;
-          rows.push({name:item.name || "Unnamed", year:Number(yearKey), amount, date});
-          total += amount;
+          const history = Array.isArray(yd?.paymentHistory) ? yd.paymentHistory : [];
+          if (history.length) {
+            // Count each recorded installment once, using its chosen payment date
+            // when available and its timestamp as a backward-compatible fallback.
+            for (const payment of history) {
+              const amount = Number(payment?.amount || 0);
+              const receivedAt = String(payment?.receivedAt || "");
+              const date = normalizePaymentDate(payment?.paymentDate || (receivedAt ? receivedAt.slice(0,10) : ""));
+              if (!Number.isFinite(amount) || amount <= 0 || !date || date < from || date > to) continue;
+              rows.push({name:item.name || "Unnamed", year:Number(yearKey), amount, date});
+              total += amount;
+            }
+          } else {
+            // Legacy records without installment history can only be reported as
+            // their stored cumulative total and stored payment date.
+            const amount = Number(yd?.paid || 0);
+            const date = normalizePaymentDate(yd?.date_paid || "");
+            if (yd?.is_due || amount <= 0 || !date || date < from || date > to) continue;
+            rows.push({name:item.name || "Unnamed", year:Number(yearKey), amount, date});
+            total += amount;
+          }
         }
       }
       rows.sort((a,b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
@@ -1319,7 +1336,7 @@
       if (!rows.length) {
         html = '<div class="report-empty">No contributions found for this date range.</div>';
       } else {
-        html = '<div class="report-summary"><span>' + rows.length + ' contribution' + (rows.length !== 1 ? 's' : '') + '</span><span>Total: ₹' + total.toLocaleString("en-IN") + '</span></div>';
+        html = '<div class="report-summary"><span>' + rows.length + ' payment' + (rows.length !== 1 ? 's' : '') + '</span><span>Total received: ₹' + total.toLocaleString("en-IN") + '</span></div>';
         html += '<div class="report-table-wrap"><table class="report-table"><thead><tr><th>Date</th><th>Name</th><th>Year</th><th>Amount</th></tr></thead><tbody>';
         html += rows.map(r => '<tr><td>' + esc(formatReportDate(r.date)) + '</td><td>' + esc(r.name) + '</td><td>' + r.year + '</td><td>₹' + r.amount.toLocaleString("en-IN") + '</td></tr>').join("");
         html += '</tbody></table></div>';
@@ -1329,6 +1346,7 @@
       if (includes2025) {
         html += '<div class="report-note">2025 historical entries do not have payment dates stored in the current database, so they cannot be included accurately in a date-range revenue report. Their 2025 amounts remain unchanged.</div>';
       }
+      html += '<div class="report-note">For older records without payment-by-payment history, the report can only use the stored cumulative paid amount and payment date. Older instalments cannot be separated if they were never recorded individually.</div>';
       $("revenueResults").innerHTML = html;
     }
 
@@ -1600,18 +1618,31 @@
       const fn = $("fnInitial").value.trim().toLowerCase();
       const sn = $("snInitial").value.trim().toLowerCase();
       const qtext = $("generalSearch").value.trim().toLowerCase();
-      const dateFilter = $("dateFilter").value;
+      const phoneQuery = $("phoneSearch").value.trim().replace(/\D/g, "");
+      const dateFilter = normalizePaymentDate($("dateFilter").value);
+      const statusFilter = $("statusFilter").value;
 
       const rows = chandaData.filter(item => {
         const parts = (item.name || "").trim().split(/\s+/);
         const first = parts[0] || "";
         const last = parts.length > 1 ? parts[parts.length - 1] : "";
         const yd = getYearData(item);
-        const haystack = [item.name,item.street,item.bill_no,yd.bill_no].join(" ").toLowerCase();
+        const phone = String(item.phone ?? "").replace(/\D/g, "");
+        const haystack = [item.name,item.street,item.bill_no,yd.bill_no,item.phone].join(" ").toLowerCase();
         if (fn && !first.toLowerCase().startsWith(fn)) return false;
         if (sn && !last.toLowerCase().startsWith(sn)) return false;
         if (qtext && !haystack.includes(qtext)) return false;
-        if (dateFilter && yd.date_paid !== dateFilter) return false;
+        if (phoneQuery && (!phone || !phone.includes(phoneQuery))) return false;
+        if (dateFilter && normalizePaymentDate(yd.date_paid) !== dateFilter) return false;
+
+        const amount = Number(yd.paid || 0);
+        const targetAmount = Number(yd.total_amount || 0);
+        const hasDonation = String(yd.donation || "").trim() !== "";
+        const hasBalance = targetAmount > amount;
+        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (hasBalance ? "part-paid" : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending")));
+        if (statusFilter === "donated") { if (!hasDonation) return false; }
+        else if (statusFilter === "part-paid") { if (!hasBalance) return false; }
+        else if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       }).map(flattenForExcel);
 
@@ -1727,7 +1758,7 @@
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist,
       openUserPaymentReport, closeUserPaymentReport, generateUserPaymentReport,
-      openChangeHistory, closeChangeHistory, toggleBillNoSort,
+      openChangeHistory, closeChangeHistory, toggleBillNoSort, toggleNameSort,
       updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel, showDonatedFilter, showPartPaidFilter,
       exportVisibleExcel
     });
