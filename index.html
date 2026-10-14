@@ -366,12 +366,12 @@
           <label id="yearPaidLabel">2026 Total Amount Expected (₹)</label>
           <input type="number" id="editPaidYear" min="0" step="1" placeholder="Enter total amount expected" oninput="updateDueStatusOnInput()">
           <div class="small-muted" style="margin-top:5px;">Total amount the member is expected to pay.</div>
+          <button type="button" id="clearPaidBtn" class="btn btn-outline small-btn" style="display:none;margin-top:6px;" onclick="clearPaidMark()">Clear Paid Mark</button>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label>Amount Paid Now (₹)</label>
           <input type="number" id="editPaymentNow" min="0" step="1" placeholder="Enter amount received this time">
           <div class="small-muted" style="margin-top:5px;">For part payments, enter only the amount received today. This adds to previous payments.</div>
-          <button type="button" id="clearPaidBtn" class="btn btn-outline small-btn" style="display:none;margin-top:6px;" onclick="clearPaidMark()">Clear Paid Mark</button>
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -1581,7 +1581,7 @@
       closeYearModal, openEditModal, openAddModal, closeModal, toggleDueState,
       openRevenueReport, closeRevenueReport, generateRevenueReport,
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist, openChangeHistory, closeChangeHistory, toggleBillNoSort,
-      updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel, showDonatedFilter,
+      updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel, showDonatedFilter, showPartPaidFilter,
       exportVisibleExcel
     });
   </script>
