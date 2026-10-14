@@ -683,6 +683,7 @@
         date_paid: item.years?.[String(year)]?.date_paid ?? "",
         remarks: item.years?.[String(year)]?.remarks ?? "",
         donation: item.years?.[String(year)]?.donation ?? "",
+        paymentHistory: Array.isArray(item.years?.[String(year)]?.paymentHistory) ? item.years[String(year)].paymentHistory : [],
         total_amount: Number(item.years?.[String(year)]?.total_amount ?? item.years?.[String(year)]?.paid ?? 0),
         lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? "",
         lastChangeDetails: item.years?.[String(year)]?.lastChangeDetails ?? ""
@@ -796,7 +797,8 @@
         const balance = Math.max(0, targetAmount - amount);
         const hasDonation = String(yd.donation || "").trim() !== "";
         if (hasDonation) donatedCount++;
-        if (balance > 0 && amount > 0) { partPaidCount++; remainingTotal += balance; }
+        if (balance > 0) remainingTotal += balance;
+        if (balance > 0 && amount > 0) partPaidCount++;
 
         if (yd.is_due) {
           dueCount++;
@@ -859,6 +861,8 @@
           badge = '<span class="badge badge-paid">Donated</span>';
         }
 
+        const lastPayment = (yd.paymentHistory || []).slice(-1)[0];
+        const paymentAttribution = lastPayment ? `<p class="last-change">Payment recorded by <b>${esc(lastPayment.receivedBy || "Unknown Google account")}</b> · This payment: ₹${Number(lastPayment.amount || 0).toLocaleString("en-IN")} · Total deposited: ₹${Number(yd.paid || 0).toLocaleString("en-IN")}</p>` : (Number(yd.paid || 0) > 0 ? `<p class="last-change">Total deposited: ₹${Number(yd.paid || 0).toLocaleString("en-IN")} · Google account attribution is available for new payments</p>` : "");
         const change = yd.lastChangedBy && yd.lastChangedBy !== "Initial imported data"
           ? `<p class="last-change">Last change by <b>${esc(yd.lastChangedBy)}</b>${yd.lastChangeDetails ? " — " + esc(yd.lastChangeDetails) : ""}</p>` : "";
 
@@ -873,6 +877,7 @@
                 ${currentYear !== 2025 ? ` | ${currentYear} Paid: <b>₹${yd.paid}</b>${balance > 0 ? ` | Remaining: <b>₹${balance}</b>` : ""}` : ""}
               </p>
               ${change}
+              ${paymentAttribution}
             </div>
             <div>${badge}</div>
           </div>`;
@@ -1112,10 +1117,13 @@
         if (paymentNow > 0 && targetAmount <= 0) { alert("Enter the total amount expected before recording a payment."); return; }
         if (paymentNow > 0 && previousPaid + paymentNow > targetAmount) { alert("This payment exceeds the remaining balance of ₹" + Math.max(0, targetAmount - previousPaid) + "."); return; }
         const updatedPaid = paymentNow > 0 ? previousPaid + paymentNow : (targetAmount > 0 && !existingItem ? 0 : previousPaid);
+        const oldPaymentHistory = existingItem ? getYearData(existingItem, currentYear).paymentHistory || [] : [];
+        const paymentHistory = paymentNow > 0 ? [...oldPaymentHistory, { amount: paymentNow, receivedBy: changedBy, receivedAt: new Date().toISOString() }] : oldPaymentHistory;
         const yearData = {
           bill_no: $("editBillNoYear").value.trim(),
           paid: updatedPaid,
           total_amount: targetAmount || previousPaid,
+          paymentHistory,
           is_due: currentIsDue,
           date_paid: normalizePaymentDate($("editDatePaid").value || ""),
           remarks: $("editRemarks").value || "",
@@ -1416,6 +1424,7 @@
         row[`${year} Paid`] = Number(yd.paid || 0);
         row[`${year} Total Expected`] = Number(yd.total_amount ?? yd.paid ?? 0);
         row[`${year} Remaining Balance`] = Math.max(0, Number(yd.total_amount ?? yd.paid ?? 0) - Number(yd.paid || 0));
+        row[`${year} Payment History`] = (Array.isArray(yd.paymentHistory) ? yd.paymentHistory : []).map(p => `${p.receivedAt || ""}: ₹${p.amount || 0} by ${p.receivedBy || "Unknown"}`).join(" | ");
         row[`${year} Due`] = yd.is_due ? "DUE" : "";
         row[`${year} Payment Date`] = yd.date_paid ?? "";
         row[`${year} Remarks`] = yd.remarks ?? "";
