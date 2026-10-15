@@ -821,7 +821,8 @@
         const balance = Math.max(0, targetAmount - amount);
         const hasDonation = String(yd.donation || "").trim() !== "";
         if (hasDonation) donatedCount++;
-        if (balance > 0) remainingTotal += balance;
+        // A member marked DUE is already counted in Due Amount; do not count the same amount again as Remaining Balance.
+        if (!yd.is_due && balance > 0) remainingTotal += balance;
         if (balance > 0 && amount > 0) partPaidCount++;
 
         if (yd.is_due) {
