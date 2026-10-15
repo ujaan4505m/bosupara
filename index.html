@@ -707,7 +707,7 @@
         remarks: item.years?.[String(year)]?.remarks ?? "",
         donation: item.years?.[String(year)]?.donation ?? "",
         paymentHistory: Array.isArray(item.years?.[String(year)]?.paymentHistory) ? item.years[String(year)].paymentHistory : [],
-        total_amount: Number(item.years?.[String(year)]?.total_amount ?? item.years?.[String(year)]?.paid ?? 0),
+        total_amount: Number(item.years?.[String(year)]?.total_amount ?? 0),
         lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? "",
         lastChangeDetails: item.years?.[String(year)]?.lastChangeDetails ?? ""
       };
@@ -928,7 +928,7 @@
       $("referenceBillLabel").textContent = `${referenceYear} Bill No. (Read-Only)`;
       $("referencePaidLabel").textContent = `${referenceYear} PAID (Strictly Read-Only)`;
       $("editBillNoYear").value = yd.bill_no ?? "";
-      $("editPaidYear").value = yd.total_amount || yd.paid || "";
+      $("editPaidYear").value = Number(yd.total_amount) > 0 ? yd.total_amount : "";
       $("editPaymentNow").value = "";
       $("editIsPartPayment").checked = false;
       togglePartPaymentMode();
