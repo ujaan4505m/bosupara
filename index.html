@@ -744,9 +744,10 @@
         const targetAmount = Number(yd.total_amount || 0);
         const hasDonation = String(yd.donation || "").trim() !== "";
         const hasBalance = targetAmount > amount;
-        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (hasBalance ? "part-paid" : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending")));
+        const isPartPaid = amount > 0 && hasBalance;
+        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (isPartPaid ? "part-paid" : (amount > 0 && !hasBalance ? "paid" : (hasDonation ? "donated" : "pending")));
         if (statusFilter === "donated") { if (!hasDonation) return false; }
-        else if (statusFilter === "part-paid") { if (!hasBalance) return false; }
+        else if (statusFilter === "part-paid") { if (!isPartPaid) return false; }
         else if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       });
@@ -1639,9 +1640,10 @@
         const targetAmount = Number(yd.total_amount || 0);
         const hasDonation = String(yd.donation || "").trim() !== "";
         const hasBalance = targetAmount > amount;
-        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (hasBalance ? "part-paid" : (amount > 0 ? "paid" : (hasDonation ? "donated" : "pending")));
+        const isPartPaid = amount > 0 && hasBalance;
+        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (isPartPaid ? "part-paid" : (amount > 0 && !hasBalance ? "paid" : (hasDonation ? "donated" : "pending")));
         if (statusFilter === "donated") { if (!hasDonation) return false; }
-        else if (statusFilter === "part-paid") { if (!hasBalance) return false; }
+        else if (statusFilter === "part-paid") { if (!isPartPaid) return false; }
         else if (statusFilter !== "all" && status !== statusFilter) return false;
         return true;
       }).map(flattenForExcel);
