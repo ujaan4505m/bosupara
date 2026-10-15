@@ -699,17 +699,36 @@
           lastChangeDetails: ""
         };
       }
+      const storedYear = item.years?.[String(year)] || {};
+      const paymentHistory = Array.isArray(storedYear.paymentHistory) ? storedYear.paymentHistory : [];
+      let paid = Number(storedYear.paid || 0);
+
+      // Correct the known Kenaram Pal 2026 legacy duplicate in the app view only.
+      // His ₹1,300 is the 2025 historical payment, not a 2026 payment.
+      // Do not write to Firestore here; the value is corrected in the record only
+      // when the user explicitly saves this member's 2026 entry.
+      if (
+        Number(year) === 2026 &&
+        String(item.name || "").trim().toLowerCase() === "kenaram pal" &&
+        String(storedYear.bill_no ?? "") === "27" &&
+        Number(item.paid_2025 || 0) === 1300 &&
+        paid === 1300 &&
+        paymentHistory.length === 0
+      ) {
+        paid = 0;
+      }
+
       return {
-        bill_no: item.years?.[String(year)]?.bill_no ?? "",
-        paid: Number(item.years?.[String(year)]?.paid || 0),
-        is_due: Boolean(item.years?.[String(year)]?.is_due),
-        date_paid: item.years?.[String(year)]?.date_paid ?? "",
-        remarks: item.years?.[String(year)]?.remarks ?? "",
-        donation: item.years?.[String(year)]?.donation ?? "",
-        paymentHistory: Array.isArray(item.years?.[String(year)]?.paymentHistory) ? item.years[String(year)].paymentHistory : [],
-        total_amount: Number(item.years?.[String(year)]?.total_amount ?? 0),
-        lastChangedBy: item.years?.[String(year)]?.lastChangedBy ?? "",
-        lastChangeDetails: item.years?.[String(year)]?.lastChangeDetails ?? ""
+        bill_no: storedYear.bill_no ?? "",
+        paid,
+        is_due: Boolean(storedYear.is_due),
+        date_paid: storedYear.date_paid ?? "",
+        remarks: storedYear.remarks ?? "",
+        donation: storedYear.donation ?? "",
+        paymentHistory,
+        total_amount: Number(storedYear.total_amount ?? 0),
+        lastChangedBy: storedYear.lastChangedBy ?? "",
+        lastChangeDetails: storedYear.lastChangeDetails ?? ""
       };
     }
 
