@@ -370,9 +370,16 @@
           <button type="button" id="clearPaidBtn" class="btn btn-outline small-btn" style="display:none;margin-top:6px;" onclick="clearPaidMark()">Clear Paid Mark</button>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label>Amount Paid Now (₹)</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="editIsPartPayment" onchange="togglePartPaymentMode()" style="width:auto;">
+            Part Payment (some money now, remaining balance later)
+          </label>
+          <div class="small-muted" style="margin-top:5px;">Tick this only when the member is paying part of the total amount and will pay the balance later.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label id="editPaymentNowLabel">Amount Paid Now (₹)</label>
           <input type="number" id="editPaymentNow" min="0" step="1" placeholder="Enter amount received this time">
-          <div class="small-muted" style="margin-top:5px;">For part payments, enter only the amount received today. This adds to previous payments.</div>
+          <div class="small-muted" id="editPaymentNowHelp" style="margin-top:5px;">For a full payment, enter the full amount received now. This adds to previous payments.</div>
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
@@ -922,6 +929,8 @@
       $("editBillNoYear").value = yd.bill_no ?? "";
       $("editPaidYear").value = yd.total_amount || yd.paid || "";
       $("editPaymentNow").value = "";
+      $("editIsPartPayment").checked = false;
+      togglePartPaymentMode();
       $("editDatePaid").value = yd.date_paid || "";
       $("editRemarks").value = yd.remarks || "";
       $("editDonation").value = yd.donation || "";
@@ -933,6 +942,7 @@
       $("editBillNoYear").readOnly = readOnlyYear;
       $("editPaidYear").readOnly = readOnlyYear;
       $("editPaymentNow").readOnly = readOnlyYear;
+      $("editIsPartPayment").disabled = readOnlyYear;
       $("editDatePaid").readOnly = readOnlyYear;
       $("clearDateBtn").disabled = readOnlyYear;
       $("editRemarks").readOnly = readOnlyYear;
@@ -1016,6 +1026,23 @@
 
     function clearPaidMark(){ $("editPaidYear").value=""; $("editDatePaid").value=""; currentIsDue=false; updateDueButtonText(); updateClearPaidButton(); }
     function updateClearPaidButton(){const b=$("clearPaidBtn"); if(b)b.style.display=(Number($("editPaidYear").value)||0)>0?"inline-flex":"none";}
+    function togglePartPaymentMode() {
+      const checkbox = $("editIsPartPayment");
+      const label = $("editPaymentNowLabel");
+      const help = $("editPaymentNowHelp");
+      const input = $("editPaymentNow");
+      if (!checkbox || !label || !help || !input) return;
+      if (checkbox.checked) {
+        label.textContent = "Part Payment Amount (₹)";
+        input.placeholder = "Enter the amount paid now";
+        help.textContent = "Enter only the amount received today. The 2026 total amount above should remain the full expected amount; the unpaid balance is calculated automatically.";
+      } else {
+        label.textContent = "Amount Paid Now (₹)";
+        input.placeholder = "Enter amount received this time";
+        help.textContent = "For a full payment, enter the full amount received now. This adds to previous payments.";
+      }
+    }
+
     function updateDueStatusOnInput() {
       const val = parseFloat($("editPaidYear").value) || 0;
       updateClearPaidButton();
@@ -1132,9 +1159,18 @@
         const paymentNowRaw = $("editPaymentNow").value.trim();
         const paymentNow = paymentNowRaw === "" ? 0 : Number(paymentNowRaw);
         const targetAmount = Number($("editPaidYear").value) || 0;
+        const isPartPayment = $("editIsPartPayment").checked;
         if (!Number.isFinite(paymentNow) || paymentNow < 0) { alert("Enter a valid amount received now."); return; }
         if (paymentNow > 0 && targetAmount <= 0) { alert("Enter the total amount expected before recording a payment."); return; }
         if (paymentNow > 0 && previousPaid + paymentNow > targetAmount) { alert("This payment exceeds the remaining balance of ₹" + Math.max(0, targetAmount - previousPaid) + "."); return; }
+        if (paymentNow > 0 && previousPaid + paymentNow < targetAmount && !isPartPayment) {
+          alert("This payment leaves a balance of ₹" + (targetAmount - previousPaid - paymentNow) + ". Please tick the Part Payment box to confirm the balance will be paid later.");
+          return;
+        }
+        if (paymentNow > 0 && isPartPayment && previousPaid + paymentNow >= targetAmount) {
+          alert("This payment completes the total amount. Please untick Part Payment for a fully paid member.");
+          return;
+        }
         const updatedPaid = paymentNow > 0 ? previousPaid + paymentNow : (targetAmount > 0 && !existingItem ? 0 : previousPaid);
         const oldPaymentHistory = existingItem ? getYearData(existingItem, currentYear).paymentHistory || [] : [];
         const paymentHistory = paymentNow > 0 ? [...oldPaymentHistory, {
