@@ -1178,7 +1178,21 @@
           return;
         }
 
-        const previousPaid = Number(existingItem ? getYearData(existingItem, currentYear).paid : 0) || 0;
+        let previousPaid = Number(existingItem ? getYearData(existingItem, currentYear).paid : 0) || 0;
+        // Defensive save-time correction for Kenaram Pal's confirmed 2025-only ₹1,300.
+        // The old 2026 field was accidentally populated with the same amount.
+        // Only apply when there is no 2026 payment history to preserve.
+        if (existingItem && Number(currentYear) === 2026) {
+          const stored2026 = existingItem.years?.["2026"] || {};
+          const history2026 = Array.isArray(stored2026.paymentHistory) ? stored2026.paymentHistory : [];
+          const isConfirmedLegacyDuplicate =
+            String(existingItem.name || "").trim().toLowerCase() === "kenaram pal" &&
+            String(stored2026.bill_no ?? "").trim() === "27" &&
+            Number(existingItem.paid_2025 || 0) === 1300 &&
+            Number(stored2026.paid || 0) === 1300 &&
+            history2026.length === 0;
+          if (isConfirmedLegacyDuplicate) previousPaid = 0;
+        }
         const paymentNowRaw = $("editPaymentNow").value.trim();
         const paymentNow = paymentNowRaw === "" ? 0 : Number(paymentNowRaw);
         const targetAmount = Number($("editPaidYear").value) || 0;
