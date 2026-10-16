@@ -1212,7 +1212,10 @@
           alert("This payment completes the total amount. Please untick Part Payment for a fully paid member.");
           return;
         }
-        const updatedPaid = paymentNow > 0 ? resultingPaid : (targetAmount > 0 && !existingItem ? 0 : previousPaid);
+        // Explicitly entering 0 and marking DUE means this member belongs in
+        // the dashboard's "Due — No Amount" count, not as previously paid.
+        const zeroAmountMarkedDue = currentIsDue && targetAmount === 0 && paymentNow === 0;
+        const updatedPaid = zeroAmountMarkedDue ? 0 : (paymentNow > 0 ? resultingPaid : (targetAmount > 0 && !existingItem ? 0 : previousPaid));
         const paymentHistory = paymentNow > 0 ? [...oldPaymentHistory, {
           amount: paymentNow,
           paymentDate: normalizePaymentDate($("editDatePaid").value || new Date().toISOString().slice(0,10)),
@@ -1224,7 +1227,7 @@
         const yearData = {
           bill_no: $("editBillNoYear").value.trim(),
           paid: updatedPaid,
-          total_amount: targetAmount || previousPaid,
+          total_amount: zeroAmountMarkedDue ? 0 : (targetAmount || previousPaid),
           paymentHistory,
           is_due: currentIsDue,
           date_paid: normalizePaymentDate($("editDatePaid").value || ""),
