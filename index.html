@@ -710,7 +710,6 @@
       if (
         Number(year) === 2026 &&
         String(item.name || "").trim().toLowerCase() === "kenaram pal" &&
-        String(storedYear.bill_no ?? "") === "27" &&
         Number(item.paid_2025 || 0) === 1300 &&
         paid === 1300 &&
         paymentHistory.length === 0
@@ -1187,7 +1186,6 @@
           const history2026 = Array.isArray(stored2026.paymentHistory) ? stored2026.paymentHistory : [];
           const isConfirmedLegacyDuplicate =
             String(existingItem.name || "").trim().toLowerCase() === "kenaram pal" &&
-            String(stored2026.bill_no ?? "").trim() === "27" &&
             Number(existingItem.paid_2025 || 0) === 1300 &&
             Number(stored2026.paid || 0) === 1300 &&
             history2026.length === 0;
