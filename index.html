@@ -1377,15 +1377,37 @@
       $("revenueModal").style.display = "none";
     }
 
-    function generateRevenueReport() {
+    async function generateRevenueReport() {
       const from = $("revenueFromDate").value;
       const to = $("revenueToDate").value;
       if (!from || !to) { alert("Please select both From Date and To Date."); return; }
       if (from > to) { alert("From Date cannot be later than To Date."); return; }
 
+      const resultsEl = $("revenueResults");
+      resultsEl.innerHTML = '<div class="report-note">Syncing latest records from the database…</div>';
+
+      let reportData;
+      try {
+        // Read a fresh Firestore snapshot when generating the report rather
+        // than relying on a possibly not-yet-updated local realtime cache.
+        const latestMembersSnapshot = await getDocs(collection(db, "members"));
+        reportData = latestMembersSnapshot.docs.map(memberDoc => ({
+          id: memberDoc.id,
+          ...memberDoc.data()
+        }));
+        // Keep the main view aligned with the same latest database snapshot.
+        chandaData = reportData;
+        buildYearList();
+        applyFilters();
+      } catch (error) {
+        console.error("Revenue report database refresh failed:", error);
+        resultsEl.innerHTML = '<div class="report-empty">Could not sync the latest database records. Please check your connection and try again.</div>';
+        return;
+      }
+
       const rows = [];
       let total = 0;
-      for (const item of chandaData) {
+      for (const item of reportData) {
         for (const [yearKey, yd] of Object.entries(item.years || {})) {
           const history = Array.isArray(yd?.paymentHistory) ? yd.paymentHistory : [];
           // A zero-paid DUE record is explicitly treated as "Due — No Amount".
