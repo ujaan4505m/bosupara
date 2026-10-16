@@ -1388,7 +1388,13 @@
       for (const item of chandaData) {
         for (const [yearKey, yd] of Object.entries(item.years || {})) {
           const history = Array.isArray(yd?.paymentHistory) ? yd.paymentHistory : [];
-          if (history.length) {
+          // A zero-paid DUE record is explicitly treated as "Due — No Amount".
+          // Do not let stale historical paymentHistory entries make that record
+          // appear as current revenue after the user clears its paid amount.
+          const currentPaid = Number(yd?.paid || 0);
+          const isBlankDue = Boolean(yd?.is_due) && currentPaid <= 0;
+
+          if (history.length && !isBlankDue) {
             // Count each recorded installment once, using its chosen payment date
             // when available and its timestamp as a backward-compatible fallback.
             for (const payment of history) {
