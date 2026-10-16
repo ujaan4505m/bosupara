@@ -1195,19 +1195,24 @@
         const paymentNow = paymentNowRaw === "" ? 0 : Number(paymentNowRaw);
         const targetAmount = Number($("editPaidYear").value) || 0;
         const isPartPayment = $("editIsPartPayment").checked;
+        const oldPaymentHistory = existingItem ? getYearData(existingItem, currentYear).paymentHistory || [] : [];
+        // Legacy entries often have an aggregate paid value but no transaction history.
+        // In that case, editing the paid amount must replace the stored total rather
+        // than add another payment to it. Entries with history keep additive behavior.
+        const isLegacyPaidValueEdit = Boolean(existingItem && paymentNow > 0 && oldPaymentHistory.length === 0);
+        const resultingPaid = isLegacyPaidValueEdit ? paymentNow : previousPaid + paymentNow;
         if (!Number.isFinite(paymentNow) || paymentNow < 0) { alert("Enter a valid amount received now."); return; }
         if (paymentNow > 0 && targetAmount <= 0) { alert("Enter the total amount expected before recording a payment."); return; }
-        if (paymentNow > 0 && previousPaid + paymentNow > targetAmount) { alert("This payment exceeds the remaining balance of ₹" + Math.max(0, targetAmount - previousPaid) + "."); return; }
-        if (paymentNow > 0 && previousPaid + paymentNow < targetAmount && !isPartPayment) {
-          alert("This payment leaves a balance of ₹" + (targetAmount - previousPaid - paymentNow) + ". Please tick the Part Payment box to confirm the balance will be paid later.");
+        if (paymentNow > 0 && resultingPaid > targetAmount) { alert("This payment exceeds the remaining balance of ₹" + Math.max(0, targetAmount - (isLegacyPaidValueEdit ? 0 : previousPaid)) + "."); return; }
+        if (paymentNow > 0 && resultingPaid < targetAmount && !isPartPayment) {
+          alert("This payment leaves a balance of ₹" + (targetAmount - resultingPaid) + ". Please tick the Part Payment box to confirm the balance will be paid later.");
           return;
         }
-        if (paymentNow > 0 && isPartPayment && previousPaid + paymentNow >= targetAmount) {
+        if (paymentNow > 0 && isPartPayment && resultingPaid >= targetAmount) {
           alert("This payment completes the total amount. Please untick Part Payment for a fully paid member.");
           return;
         }
-        const updatedPaid = paymentNow > 0 ? previousPaid + paymentNow : (targetAmount > 0 && !existingItem ? 0 : previousPaid);
-        const oldPaymentHistory = existingItem ? getYearData(existingItem, currentYear).paymentHistory || [] : [];
+        const updatedPaid = paymentNow > 0 ? resultingPaid : (targetAmount > 0 && !existingItem ? 0 : previousPaid);
         const paymentHistory = paymentNow > 0 ? [...oldPaymentHistory, {
           amount: paymentNow,
           paymentDate: normalizePaymentDate($("editDatePaid").value || new Date().toISOString().slice(0,10)),
