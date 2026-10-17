@@ -1055,9 +1055,30 @@
 
     let currentIsRestricted = false;
 
-    function toggleRestrictedState() {
-      currentIsRestricted = !currentIsRestricted;
-      updateRestrictedButtonText();
+    async function toggleRestrictedState() {
+      const id = $("editId").value;
+      if (!id) {
+        alert("Save the member first, then mark them as Restricted.");
+        return;
+      }
+      const nextRestricted = !currentIsRestricted;
+      const item = chandaData.find(x => String(x.id) === String(id));
+      const changedBy = auth.currentUser?.displayName || auth.currentUser?.email || "Unknown user";
+      try {
+        await updateDoc(doc(db, "members", String(id)), {
+          [`years.${currentYear}.is_restricted`]: nextRestricted,
+          updatedAt: serverTimestamp()
+        });
+        await recordAudit("updated", String(id), item?.name || $("editName").value.trim(), String(currentYear), changedBy,
+          nextRestricted ? "Marked as RESTRICTED" : "Restricted status cleared");
+        currentIsRestricted = nextRestricted;
+        updateRestrictedButtonText();
+        closeModal();
+        setSyncStatus("Restricted status saved • syncing…", true);
+      } catch (err) {
+        console.error("Could not update restricted status:", err);
+        alert("Could not update Restricted status. Please check your connection and try again.");
+      }
     }
 
     function updateRestrictedButtonText() {
@@ -1197,16 +1218,9 @@
           // contact information, so it may still be added/edited here.
           if (!id) return;
           const phoneChanged = (existingItem?.phone ?? "") !== phone;
-          const restrictionChanged = Boolean(getYearData(existingItem, 2025).is_restricted) !== currentIsRestricted;
-          await updateDoc(doc(db, "members", String(id)), {
-            phone,
-            ["years.2025.is_restricted"]: currentIsRestricted
-          });
+          await updateDoc(doc(db, "members", String(id)), { phone });
           if (phoneChanged) {
             await recordAudit("updated", String(id), name, yearKey, changedBy, "Phone changed to " + (phone || "blank"));
-          }
-          if (restrictionChanged) {
-            await recordAudit("updated", String(id), name, yearKey, changedBy, currentIsRestricted ? "Marked as RESTRICTED" : "Restricted status cleared");
           }
           closeModal();
           setSyncStatus("Saved • syncing…", true);
