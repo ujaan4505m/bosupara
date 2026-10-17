@@ -295,7 +295,7 @@
           
         </div>
       </div>
-      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="due-no-amount">Due - No Amount</option><option value="pending">Pending</option><option value="part-paid">Part Paid / Balance Remaining</option><option value="donated">Donated 🎁</option></select></div>
+      <div class="form-group"><label>Payment Status</label><select id="statusFilter" onchange="applyFilters()"><option value="all">All</option><option value="paid">Paid</option><option value="due">Due</option><option value="due-no-amount">Due - No Amount</option><option value="pending">Pending</option><option value="part-paid">Part Paid / Balance Remaining</option><option value="donated">Donated 🎁</option><option value="restricted">Restricted</option></select></div>
     </div>
 
     <div class="stats-bar">
@@ -393,6 +393,8 @@
         <div class="form-group" style="margin-bottom:12px;">
           <label>Status / Action</label>
           <button type="button" id="dueToggleBtn" class="btn btn-warning" onclick="toggleDueState()">Mark as DUE</button>
+          <button type="button" id="restrictedToggleBtn" class="btn btn-outline" style="margin-top:8px;" onclick="toggleRestrictedState()">Mark as Restricted</button>
+          <div class="small-muted" style="margin-top:5px;">Restricted members stay in the database but are excluded from Pending and Due counts.</div>
         </div>
 
         <div class="form-group" style="margin-bottom:15px;">
@@ -721,6 +723,7 @@
         bill_no: storedYear.bill_no ?? "",
         paid,
         is_due: Boolean(storedYear.is_due),
+        is_restricted: Boolean(storedYear.is_restricted),
         date_paid: storedYear.date_paid ?? "",
         remarks: storedYear.remarks ?? "",
         donation: storedYear.donation ?? "",
@@ -770,7 +773,7 @@
         const hasDonation = String(yd.donation || "").trim() !== "";
         const hasBalance = targetAmount > amount;
         const isPartPaid = amount > 0 && hasBalance;
-        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (isPartPaid ? "part-paid" : (amount > 0 && !hasBalance ? "paid" : (hasDonation ? "donated" : "pending")));
+        const status = yd.is_restricted ? "restricted" : (yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (isPartPaid ? "part-paid" : (amount > 0 && !hasBalance ? "paid" : (hasDonation ? "donated" : "pending"))));
         if (statusFilter === "donated") { if (!hasDonation) return false; }
         else if (statusFilter === "part-paid") { if (!isPartPaid) return false; }
         else if (statusFilter !== "all" && status !== statusFilter) return false;
@@ -829,11 +832,12 @@
     }
 
     function renderDashboard() {
-      let paidCount=0, dueCount=0, pending=0, blankDue=0, donatedCount=0, partPaidCount=0;
+      let paidCount=0, dueCount=0, pending=0, blankDue=0, donatedCount=0, partPaidCount=0, restrictedCount=0;
       let paidTotal=0, dueTotal=0, remainingTotal=0;
 
       chandaData.forEach(item => {
         const yd = getYearData(item);
+        if (yd.is_restricted) { restrictedCount++; return; }
         const amount = Number(yd.paid || 0);
         const targetAmount = Number(yd.total_amount || 0);
         const balance = Math.max(0, targetAmount - amount);
@@ -868,6 +872,7 @@
         `<div class="dashboard-stat"><b>₹${paidTotal.toLocaleString("en-IN")}</b><small>Amount Paid</small></div>` +
         `<div class="dashboard-stat"><b>₹${dueTotal.toLocaleString("en-IN")}</b><small>Due Amount</small></div>` +
         `<div class="dashboard-stat"><b>${blankDue}</b><small>Due — No Amount</small></div>` +
+        `<div class="dashboard-stat" onclick="showRestrictedFilter()" style="cursor:pointer;"><b>${restrictedCount}</b><small>Restricted</small></div>` +
         `<div class="dashboard-stat" onclick="showPartPaidFilter()" style="cursor:pointer;"><b>${partPaidCount}</b><small>Part Paid</small></div>` +
         `<div class="dashboard-stat"><b>₹${remainingTotal.toLocaleString("en-IN")}</b><small>Remaining Balance</small></div>` +
         `<div class="dashboard-stat" onclick="showDonatedFilter()" style="cursor:pointer;"><b>${donatedCount}</b><small>Donated 🎁</small></div>` +
@@ -890,7 +895,9 @@
         const targetAmount = Number(yd.total_amount || 0);
         const balance = Math.max(0, targetAmount - Number(yd.paid || 0));
         let badge = '<span class="badge badge-pending">Pending</span>';
-        if (currentYear === 2025) {
+        if (yd.is_restricted) {
+          badge = '<span class="badge" style="background:#e8def8;color:#4a148c;">RESTRICTED</span>';
+        } else if (currentYear === 2025) {
           badge = `<span class="badge badge-paid">₹${yd.paid}</span>`;
         } else if (yd.is_due) {
           badge = '<span class="badge badge-due">DUE</span>';
@@ -973,7 +980,9 @@
       $("yearPaidLabel").textContent = `${currentYear} PAID (₹)`;
 
       currentIsDue = !!yd.is_due;
+      currentIsRestricted = !!yd.is_restricted;
       updateDueButtonText();
+      updateRestrictedButtonText();
 
       const changeBox = $("lastChangeBox");
       if (yd.lastChangedBy) {
@@ -1030,7 +1039,9 @@
       $("historyBtn").style.display = "none";
 
       currentIsDue = false;
+      currentIsRestricted = false;
       updateDueButtonText();
+      updateRestrictedButtonText();
       $("detailModal").style.display = "flex";
     }
 
@@ -1039,6 +1050,20 @@
     function toggleDueState() {
       currentIsDue = !currentIsDue;
       updateDueButtonText();
+    }
+
+    let currentIsRestricted = false;
+
+    function toggleRestrictedState() {
+      currentIsRestricted = !currentIsRestricted;
+      updateRestrictedButtonText();
+    }
+
+    function updateRestrictedButtonText() {
+      const btn = $("restrictedToggleBtn");
+      if (!btn) return;
+      btn.textContent = currentIsRestricted ? "Status: RESTRICTED (Click to Restore)" : "Mark as Restricted";
+      btn.className = currentIsRestricted ? "btn btn-danger" : "btn btn-outline";
     }
 
     function clearPaymentDate() {
@@ -1111,6 +1136,9 @@
       }
       if (Boolean(oldYear?.is_due) !== Boolean(yearData.is_due)) {
         changes.push(yearData.is_due ? "Marked as DUE" : "DUE status cleared");
+      }
+      if (Boolean(oldYear?.is_restricted) !== Boolean(yearData.is_restricted)) {
+        changes.push(yearData.is_restricted ? "Marked as RESTRICTED" : "Restricted status cleared");
       }
       if ((oldYear?.date_paid ?? "") !== yearData.date_paid) {
         changes.push(yearData.date_paid ? "Payment Date changed to " + yearData.date_paid : "Payment Date cleared");
@@ -1226,6 +1254,7 @@
         }] : oldPaymentHistory;
         const yearData = {
           bill_no: $("editBillNoYear").value.trim(),
+          is_restricted: currentIsRestricted,
           paid: updatedPaid,
           total_amount: zeroAmountMarkedDue ? 0 : (targetAmount || previousPaid),
           paymentHistory,
@@ -1678,6 +1707,17 @@
       $("statusFilter").scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
+    function showRestrictedFilter() {
+      $("fnInitial").value = "";
+      $("snInitial").value = "";
+      $("generalSearch").value = "";
+      $("phoneSearch").value = "";
+      $("dateFilter").value = "";
+      $("statusFilter").value = "restricted";
+      applyFilters();
+      $("statusFilter").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
     function flattenForExcel(item) {
       const row = {
         "Member ID": item.id,
@@ -1748,7 +1788,7 @@
         const hasDonation = String(yd.donation || "").trim() !== "";
         const hasBalance = targetAmount > amount;
         const isPartPaid = amount > 0 && hasBalance;
-        const status = yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (isPartPaid ? "part-paid" : (amount > 0 && !hasBalance ? "paid" : (hasDonation ? "donated" : "pending")));
+        const status = yd.is_restricted ? "restricted" : (yd.is_due ? (amount > 0 ? "due" : "due-no-amount") : (isPartPaid ? "part-paid" : (amount > 0 && !hasBalance ? "paid" : (hasDonation ? "donated" : "pending"))));
         if (statusFilter === "donated") { if (!hasDonation) return false; }
         else if (statusFilter === "part-paid") { if (!isPartPaid) return false; }
         else if (statusFilter !== "all" && status !== statusFilter) return false;
@@ -1868,7 +1908,7 @@
       openAmountShortlist, closeAmountShortlist, generateAmountShortlist,
       openUserPaymentReport, closeUserPaymentReport, generateUserPaymentReport,
       openChangeHistory, closeChangeHistory, toggleBillNoSort, toggleNameSort,
-      updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel, showDonatedFilter, showPartPaidFilter,
+      showRestrictedFilter, toggleRestrictedState, updateDueStatusOnInput, clearPaidMark, clearPaymentDate, saveMember, applyFilters, exportAllExcel, showDonatedFilter, showPartPaidFilter,
       exportVisibleExcel
     });
   </script>
