@@ -698,7 +698,8 @@
           date_paid: "",
           remarks: "",
           lastChangedBy: "Initial imported data",
-          lastChangeDetails: ""
+          lastChangeDetails: "",
+          is_restricted: Boolean(item.years?.["2025"]?.is_restricted)
         };
       }
       const storedYear = item.years?.[String(year)] || {};
@@ -1196,9 +1197,16 @@
           // contact information, so it may still be added/edited here.
           if (!id) return;
           const phoneChanged = (existingItem?.phone ?? "") !== phone;
-          await updateDoc(doc(db, "members", String(id)), { phone });
+          const restrictionChanged = Boolean(getYearData(existingItem, 2025).is_restricted) !== currentIsRestricted;
+          await updateDoc(doc(db, "members", String(id)), {
+            phone,
+            ["years.2025.is_restricted"]: currentIsRestricted
+          });
           if (phoneChanged) {
             await recordAudit("updated", String(id), name, yearKey, changedBy, "Phone changed to " + (phone || "blank"));
+          }
+          if (restrictionChanged) {
+            await recordAudit("updated", String(id), name, yearKey, changedBy, currentIsRestricted ? "Marked as RESTRICTED" : "Restricted status cleared");
           }
           closeModal();
           setSyncStatus("Saved • syncing…", true);
