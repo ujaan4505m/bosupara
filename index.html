@@ -383,7 +383,8 @@
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
-          <label>Payment Date</label>
+          <label>New Payment Date</label>
+          <div class="small-muted" style="margin-bottom:5px;">Select the date money was received. Existing payment dates are kept unchanged when no new payment is entered.</div>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="date" id="editDatePaid" style="flex:1;">
             <button type="button" id="clearDateBtn" class="btn btn-outline small-btn" onclick="clearPaymentDate()">✕ Clear Date</button>
@@ -958,7 +959,7 @@
       $("editPaymentNow").value = "";
       $("editIsPartPayment").checked = false;
       togglePartPaymentMode();
-      $("editDatePaid").value = yd.date_paid || "";
+      $("editDatePaid").value = "";
       $("editRemarks").value = yd.remarks || "";
       $("editDonation").value = yd.donation || "";
 
@@ -1252,6 +1253,7 @@
         const isLegacyPaidValueEdit = Boolean(existingItem && paymentNow > 0 && oldPaymentHistory.length === 0);
         const resultingPaid = isLegacyPaidValueEdit ? paymentNow : previousPaid + paymentNow;
         if (!Number.isFinite(paymentNow) || paymentNow < 0) { alert("Enter a valid amount received now."); return; }
+        if (paymentNow > 0 && !$("editDatePaid").value) { alert("Please select the actual date the payment was received."); return; }
         if (paymentNow > 0 && targetAmount <= 0) { alert("Enter the total amount expected before recording a payment."); return; }
         if (paymentNow > 0 && resultingPaid > targetAmount) { alert("This payment exceeds the remaining balance of ₹" + Math.max(0, targetAmount - (isLegacyPaidValueEdit ? 0 : previousPaid)) + "."); return; }
         if (paymentNow > 0 && resultingPaid < targetAmount && !isPartPayment) {
@@ -1268,7 +1270,7 @@
         const updatedPaid = zeroAmountMarkedDue ? 0 : (paymentNow > 0 ? resultingPaid : (targetAmount > 0 && !existingItem ? 0 : previousPaid));
         const paymentHistory = paymentNow > 0 ? [...oldPaymentHistory, {
           amount: paymentNow,
-          paymentDate: normalizePaymentDate($("editDatePaid").value || new Date().toISOString().slice(0,10)),
+          paymentDate: normalizePaymentDate($("editDatePaid").value),
           receivedBy: changedBy,
           receivedByEmail: auth.currentUser?.email || "",
           receivedByUid: auth.currentUser?.uid || "",
@@ -1281,7 +1283,9 @@
           total_amount: zeroAmountMarkedDue ? 0 : (targetAmount || previousPaid),
           paymentHistory,
           is_due: currentIsDue,
-          date_paid: normalizePaymentDate($("editDatePaid").value || ""),
+          date_paid: paymentNow > 0
+            ? normalizePaymentDate($("editDatePaid").value)
+            : (existingItem ? getYearData(existingItem, currentYear).date_paid : ""),
           remarks: $("editRemarks").value || "",
           donation: $("editDonation").value.trim(),
           lastChangedBy: changedBy
