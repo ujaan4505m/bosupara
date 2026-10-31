@@ -922,9 +922,9 @@
         }
 
         const lastPayment = (yd.paymentHistory || []).slice(-1)[0];
-        const paymentAttribution = lastPayment ? `<p class="last-change">Payment recorded by <b>${esc(lastPayment.receivedBy || "Unknown Google account")}</b> · This payment: ₹${Number(lastPayment.amount || 0).toLocaleString("en-IN")} · Total deposited: ₹${Number(yd.paid || 0).toLocaleString("en-IN")}</p>` : (Number(yd.paid || 0) > 0 ? `<p class="last-change">Total deposited: ₹${Number(yd.paid || 0).toLocaleString("en-IN")} · Google account attribution is available for new payments</p>` : "");
+        const paymentAttribution = lastPayment ? `<p class="last-change">Payment entered under Google account <b>${esc(lastPayment.receivedBy || "Unknown Google account")}</b> · This payment: ₹${Number(lastPayment.amount || 0).toLocaleString("en-IN")} · Total deposited: ₹${Number(yd.paid || 0).toLocaleString("en-IN")}</p>` : (Number(yd.paid || 0) > 0 ? `<p class="last-change">Total deposited: ₹${Number(yd.paid || 0).toLocaleString("en-IN")} · Google account attribution is available for new payments</p>` : "");
         const change = yd.lastChangedBy && yd.lastChangedBy !== "Initial imported data"
-          ? `<p class="last-change">Last change by <b>${esc(yd.lastChangedBy)}</b>${yd.lastChangeDetails ? " — " + esc(yd.lastChangeDetails) : ""}</p>` : "";
+          ? `<p class="last-change">Last change under Google account <b>${esc(yd.lastChangedBy)}</b>${yd.lastChangeDetails ? " — " + esc(yd.lastChangeDetails) : ""}</p>` : "";
 
         return `
           <div class="member-item" onclick="openEditModal('${esc(item.id)}')">
@@ -998,7 +998,7 @@
       if (yd.lastChangedBy) {
         changeBox.style.display = "block";
         changeBox.innerHTML =
-          `Last change recorded in ${currentYear} by <b>${esc(yd.lastChangedBy)}</b>` +
+          `Last change recorded in ${currentYear} under Google account <b>${esc(yd.lastChangedBy)}</b>` +
           (yd.lastChangeDetails ? `<br><span style="display:inline-block;margin-top:4px;">${esc(yd.lastChangeDetails)}</span>` : "") +
           `<div id="lastChangeWhen" class="history-when">Loading date & time…</div>`;
       } else {
@@ -1507,15 +1507,16 @@
           const isBlankDue = Boolean(yd?.is_due) && currentPaid <= 0;
 
           if (history.length && !isBlankDue) {
-            // Count each recorded installment once, using its chosen payment date
-            // when available and its timestamp as a backward-compatible fallback.
+            // Count each recorded installment only by its actual payment date.
+            // receivedAt is when the record was saved, NOT when money was received.
             for (const payment of history) {
               const amount = Number(payment?.amount || 0);
               const receivedAt = String(payment?.receivedAt || "");
               // For a single legacy payment, use the member's recorded payment date
               // before falling back to receivedAt (which is only the save timestamp).
               const legacySinglePaymentDate = history.length === 1 ? (yd?.date_paid || "") : "";
-              const date = normalizePaymentDate(payment?.paymentDate || legacySinglePaymentDate || (receivedAt ? receivedAt.slice(0,10) : ""));
+              // Never substitute receivedAt: a later edit must not look like a new payment date.
+              const date = normalizePaymentDate(payment?.paymentDate || legacySinglePaymentDate);
               if (!Number.isFinite(amount) || amount <= 0 || !date || date < from || date > to) continue;
               rows.push({name:item.name || "Unnamed", year:Number(yearKey), amount, date});
               total += amount;
@@ -1613,7 +1614,7 @@
             user: name,
             email,
             amount,
-            paymentDate: normalizePaymentDate(payment.paymentDate || (payment.receivedAt ? payment.receivedAt.slice(0,10) : "")),
+            paymentDate: normalizePaymentDate(payment.paymentDate || (history.length === 1 ? yd.date_paid : "")),
             receivedAt: payment.receivedAt || ""
           });
         }
