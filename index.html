@@ -383,9 +383,8 @@
         </div>
 
         <div class="form-group" style="margin-bottom:12px;">
-          <label>New Payment Date</label>
-          <div class="small-muted" style="margin-bottom:5px;">Select the date money was received. Existing payment dates are kept unchanged when no new payment is entered.</div>
-          <div id="currentPaymentDateInfo" class="small-muted" style="margin-bottom:7px;display:none;"></div>
+          <label>Payment Date</label>
+          <div class="small-muted" style="margin-bottom:5px;">The previously recorded date is shown here. Change it only when recording a new payment or correcting a date.</div>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="date" id="editDatePaid" style="flex:1;">
             <button type="button" id="clearDateBtn" class="btn btn-outline small-btn" onclick="clearPaymentDate()">✕ Clear Date</button>
@@ -727,7 +726,13 @@
         paid,
         is_due: Boolean(storedYear.is_due),
         is_restricted: Boolean(storedYear.is_restricted),
-        date_paid: storedYear.date_paid ?? "",
+        // Prefer the explicit member payment date; for older records where it
+        // was only stored on the payment-history entry, recover it from there.
+        date_paid: storedYear.date_paid || (
+          paymentHistory.length
+            ? (paymentHistory[paymentHistory.length - 1]?.paymentDate || "")
+            : ""
+        ),
         remarks: storedYear.remarks ?? "",
         donation: storedYear.donation ?? "",
         paymentHistory,
@@ -960,15 +965,9 @@
       $("editPaymentNow").value = "";
       $("editIsPartPayment").checked = false;
       togglePartPaymentMode();
-      $("editDatePaid").value = "";
-      const previousPaymentDate = yd.date_paid || "";
-      const previousPaymentDateInfo = $("currentPaymentDateInfo");
-      if (previousPaymentDateInfo) {
-        previousPaymentDateInfo.style.display = previousPaymentDate ? "block" : "none";
-        previousPaymentDateInfo.textContent = previousPaymentDate
-          ? "Previously recorded payment date: " + formatDisplayDate(previousPaymentDate)
-          : "";
-      }
+      // Show the existing date in the original date field again.
+      // This is display-only unless a new payment amount is entered.
+      $("editDatePaid").value = normalizePaymentDate(yd.date_paid || "");
       $("editRemarks").value = yd.remarks || "";
       $("editDonation").value = yd.donation || "";
 
@@ -1033,11 +1032,6 @@
       $("editIsPartPayment").disabled = false;
       togglePartPaymentMode();
       $("editDatePaid").value = "";
-      const previousPaymentDateInfo = $("currentPaymentDateInfo");
-      if (previousPaymentDateInfo) {
-        previousPaymentDateInfo.style.display = "none";
-        previousPaymentDateInfo.textContent = "";
-      }
       $("editRemarks").value = "";
       $("editDonation").value = "";
       $("editName").readOnly = false;
@@ -1509,7 +1503,10 @@
             for (const payment of history) {
               const amount = Number(payment?.amount || 0);
               const receivedAt = String(payment?.receivedAt || "");
-              const date = normalizePaymentDate(payment?.paymentDate || (receivedAt ? receivedAt.slice(0,10) : ""));
+              // For a single legacy payment, use the member's recorded payment date
+              // before falling back to receivedAt (which is only the save timestamp).
+              const legacySinglePaymentDate = history.length === 1 ? (yd?.date_paid || "") : "";
+              const date = normalizePaymentDate(payment?.paymentDate || legacySinglePaymentDate || (receivedAt ? receivedAt.slice(0,10) : ""));
               if (!Number.isFinite(amount) || amount <= 0 || !date || date < from || date > to) continue;
               rows.push({name:item.name || "Unnamed", year:Number(yearKey), amount, date});
               total += amount;
