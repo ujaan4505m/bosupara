@@ -1129,7 +1129,7 @@
       }
     }
 
-    function buildChangeDetails(item, yearData, isNewMember) {
+    function buildChangeDetails(item, yearData, isNewMember, paymentDateExplicitlyEntered = false) {
       const changes = [];
       const oldYear = item ? getYearData(item, currentYear) : null;
       const oldPhone = item?.phone ?? "";
@@ -1163,7 +1163,9 @@
       if (Boolean(oldYear?.is_restricted) !== Boolean(yearData.is_restricted)) {
         changes.push(yearData.is_restricted ? "Marked as RESTRICTED" : "Restricted status cleared");
       }
-      if ((oldYear?.date_paid ?? "") !== yearData.date_paid) {
+      // A payment date is auditable only when this save explicitly records a new payment.
+      // Editing unrelated member fields must never create a payment-date change.
+      if (paymentDateExplicitlyEntered && (oldYear?.date_paid ?? "") !== yearData.date_paid) {
         changes.push(yearData.date_paid ? "Payment Date changed to " + yearData.date_paid : "Payment Date cleared");
       }
       if ((oldYear?.remarks ?? "") !== yearData.remarks) {
@@ -1291,17 +1293,33 @@
           lastChangedBy: changedBy
         };
 
-        const changeDetails = buildChangeDetails(existingItem, yearData, !id);
+        const changeDetails = buildChangeDetails(existingItem, yearData, !id, paymentNow > 0);
         yearData.lastChangeDetails = changeDetails;
 
         if (id) {
-          await updateDoc(doc(db, "members", String(id)), {
+          // Update year fields individually. Crucially, do not write date_paid at all
+          // unless this save includes a newly received payment with an explicitly selected date.
+          // This prevents unrelated edits (or stale browser state) from changing payment dates.
+          const memberUpdate = {
             name,
             street,
             phone,
-            [`years.${yearKey}`]: yearData,
+            [`years.${yearKey}.bill_no`]: yearData.bill_no,
+            [`years.${yearKey}.is_restricted`]: yearData.is_restricted,
+            [`years.${yearKey}.paid`]: yearData.paid,
+            [`years.${yearKey}.total_amount`]: yearData.total_amount,
+            [`years.${yearKey}.paymentHistory`]: yearData.paymentHistory,
+            [`years.${yearKey}.is_due`]: yearData.is_due,
+            [`years.${yearKey}.remarks`]: yearData.remarks,
+            [`years.${yearKey}.donation`]: yearData.donation,
+            [`years.${yearKey}.lastChangedBy`]: yearData.lastChangedBy,
+            [`years.${yearKey}.lastChangeDetails`]: yearData.lastChangeDetails,
             updatedAt: serverTimestamp()
-          });
+          };
+          if (paymentNow > 0) {
+            memberUpdate[`years.${yearKey}.date_paid`] = yearData.date_paid;
+          }
+          await updateDoc(doc(db, "members", String(id)), memberUpdate);
           await recordAudit("updated", String(id), name, yearKey, changedBy, changeDetails);
         } else {
           const newId = crypto.randomUUID();
