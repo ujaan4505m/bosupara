@@ -385,6 +385,7 @@
         <div class="form-group" style="margin-bottom:12px;">
           <label>New Payment Date</label>
           <div class="small-muted" style="margin-bottom:5px;">Select the date money was received. Existing payment dates are kept unchanged when no new payment is entered.</div>
+          <div id="currentPaymentDateInfo" class="small-muted" style="margin-bottom:7px;display:none;"></div>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="date" id="editDatePaid" style="flex:1;">
             <button type="button" id="clearDateBtn" class="btn btn-outline small-btn" onclick="clearPaymentDate()">✕ Clear Date</button>
@@ -960,6 +961,14 @@
       $("editIsPartPayment").checked = false;
       togglePartPaymentMode();
       $("editDatePaid").value = "";
+      const previousPaymentDate = yd.date_paid || "";
+      const previousPaymentDateInfo = $("currentPaymentDateInfo");
+      if (previousPaymentDateInfo) {
+        previousPaymentDateInfo.style.display = previousPaymentDate ? "block" : "none";
+        previousPaymentDateInfo.textContent = previousPaymentDate
+          ? "Previously recorded payment date: " + formatDisplayDate(previousPaymentDate)
+          : "";
+      }
       $("editRemarks").value = yd.remarks || "";
       $("editDonation").value = yd.donation || "";
 
@@ -1024,6 +1033,11 @@
       $("editIsPartPayment").disabled = false;
       togglePartPaymentMode();
       $("editDatePaid").value = "";
+      const previousPaymentDateInfo = $("currentPaymentDateInfo");
+      if (previousPaymentDateInfo) {
+        previousPaymentDateInfo.style.display = "none";
+        previousPaymentDateInfo.textContent = "";
+      }
       $("editRemarks").value = "";
       $("editDonation").value = "";
       $("editName").readOnly = false;
